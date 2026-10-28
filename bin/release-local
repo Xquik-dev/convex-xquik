@@ -94,9 +94,12 @@ if ${dry_run}; then
 fi
 
 step "Publishing ${expected_name}@${version} to npm"
-published="$(npm view "${expected_name}@${version}" version --registry "${registry}" 2>/dev/null || true)"
-if [[ "${published}" == "${version}" ]]; then
-  echo "${expected_name}@${version} is already on npm, so the upload is skipped."
+served="$(npm view "${expected_name}@${version}" dist.integrity --registry "${registry}" 2>/dev/null || true)"
+integrity="$(jq -r -e '.[0].integrity' <<<"${packed}")"
+if [[ "${served}" == "${integrity}" ]]; then
+  echo "npm already serves this ${expected_name}@${version} tarball, so the script skips the upload."
+elif [[ -n "${served}" ]]; then
+  fail "npm serves a different ${expected_name}@${version}. Raise the version in package.json and CHANGELOG.md first."
 else
   npmrc="${workspace}/npmrc"
   (umask 077 && : >"${npmrc}")
@@ -116,7 +119,7 @@ git push --quiet origin "refs/tags/${tag}"
 
 step "Creating the GitHub release ${tag}"
 if gh release view "${tag}" --repo "${repository}" >/dev/null 2>&1; then
-  echo "The ${tag} release exists, so it stays as it is."
+  echo "The ${tag} release exists, so the script leaves it unchanged."
 else
   gh release create "${tag}" "${archive}" --repo "${repository}" --title "${tag}" --notes-file "${notes}" --verify-tag
 fi

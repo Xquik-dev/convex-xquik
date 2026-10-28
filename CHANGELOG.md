@@ -4,7 +4,7 @@
 
 - Type each operation's result & check it with a validator from `openapi.json`. Export `OperationResult`.
 - Fail a job without a retry when its result breaks the result schema.
-- Refuse every public component function with `missing_api_key` until the deployment sets `XQUIK_API_KEY`.
+- Throw `missing_api_key` from every public component function until the deployment sets `XQUIK_API_KEY`.
 
 ## 0.1.0
 

@@ -31,6 +31,7 @@ test("every public component function refuses a deployment without XQUIK_API_KEY
     "webhooks.add": t.mutation(api.webhooks.add, { secret: SECRET }),
     "webhooks.list": t.query(api.webhooks.list, {}),
     "webhooks.remove": t.action(api.webhooks.remove, { endpointId }),
+    "operations.getUser": t.action(api.operations.getUser, { id: "NASA" }),
   };
   const outcomes = await Promise.all(Object.values(calls).map(rejection));
   expect(Object.fromEntries(Object.keys(calls).map((name, index) => [name, outcomes[index]]))).toEqual({
@@ -44,6 +45,7 @@ test("every public component function refuses a deployment without XQUIK_API_KEY
     "webhooks.add": MISSING,
     "webhooks.list": MISSING,
     "webhooks.remove": MISSING,
+    "operations.getUser": MISSING,
   });
   expect(recorded).toHaveLength(0);
 });
