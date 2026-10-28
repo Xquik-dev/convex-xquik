@@ -3,16 +3,19 @@ export type Shape =
   | "number"
   | "boolean"
   | "null"
+  | "bytes"
   | "any"
   | { readonly literal: string | number | boolean }
   | { readonly array: Shape }
   | { readonly object: Readonly<Record<string, Field>> }
   | { readonly record: Shape }
-  | { readonly union: readonly Shape[] };
+  | { readonly union: readonly Shape[] }
+  | { readonly ref: string };
 
 export interface Field {
   readonly shape: Shape;
   readonly optional: boolean;
+  readonly wire?: string;
 }
 
 export interface Param {
@@ -30,11 +33,15 @@ export interface Operation {
   readonly body: readonly string[] | null;
   readonly response: Response;
   readonly args: Readonly<Record<string, Field>>;
+  readonly result: Shape;
 }
 
-export type Registry = Readonly<Record<string, Operation>>;
+export interface Registry {
+  readonly operations: Readonly<Record<string, Operation>>;
+  readonly schemas: Readonly<Record<string, Shape>>;
+}
 
-const PRIMITIVES = new Set(["string", "number", "boolean", "null", "any"]);
+const PRIMITIVES = new Set(["string", "number", "boolean", "null", "bytes", "any"]);
 const LOCATIONS: ReadonlySet<unknown> = new Set(["path", "query", "header"]);
 const RESPONSES: ReadonlySet<unknown> = new Set(["json", "bytes", "events", "none"]);
 
@@ -55,11 +62,17 @@ function isFields(value: unknown): value is Record<string, Field> {
 }
 
 function isField(value: unknown): value is Field {
-  return isRecord(value) && typeof value["optional"] === "boolean" && isShape(value["shape"]);
+  return (
+    isRecord(value) &&
+    typeof value["optional"] === "boolean" &&
+    ["string", "undefined"].includes(typeof value["wire"]) &&
+    isShape(value["shape"])
+  );
 }
 
 function isShapeEntry([kind, inner]: [string, unknown]): boolean {
   if (kind === "literal") return ["string", "number", "boolean"].includes(typeof inner);
+  if (kind === "ref") return typeof inner === "string";
   if (kind === "array" || kind === "record") return isShape(inner);
   if (kind === "object") return isFields(inner);
   return kind === "union" && isList(inner) && inner.every(isShape);
@@ -90,12 +103,19 @@ function isOperation(value: unknown): value is Operation {
     value["params"].every(isParam) &&
     (value["body"] === null || isStrings(value["body"])) &&
     RESPONSES.has(value["response"]) &&
-    isFields(value["args"])
+    isFields(value["args"]) &&
+    isShape(value["result"])
   );
 }
 
 function isRegistry(value: unknown): value is Registry {
-  return isRecord(value) && Object.values(value).every(isOperation);
+  return (
+    isRecord(value) &&
+    isRecord(value["operations"]) &&
+    Object.values(value["operations"]).every(isOperation) &&
+    isRecord(value["schemas"]) &&
+    Object.values(value["schemas"]).every(isShape)
+  );
 }
 
 export function parseRegistry(value: unknown): Registry {
