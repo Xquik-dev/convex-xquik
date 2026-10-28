@@ -1,0 +1,7 @@
+extends: existence
+message: "Write this without the dash '%s'. End the sentence or use a comma."
+level: error
+nonword: true
+tokens:
+  - '[\u2013-\u2015]'
+  - '(?<=\S) -{1,2} (?=\S)'

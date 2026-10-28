@@ -1,0 +1,25 @@
+extends: existence
+message: "Name the concrete thing instead of '%s'."
+level: error
+ignorecase: true
+tokens:
+  - (?:affected|attack|install|public) surfaces?
+  - (?:API|app|feature|integration|MCP|platform|product|SDK|tool) surfaces?
+  - attack vectors?
+  - bedrock
+  - end[- ]?game
+  - evacuat(?:e|es|ed|ing)
+  - flywheels?
+  - gold[- ]plat(?:e|ed|ing)
+  - harness(?:es|ed|ing)? (?:the|our|your|its|their|this)
+  - loc(?:us|i)
+  - modalit(?:y|ies)
+  - nexus
+  - north[- ]stars?
+  - paradigms?
+  - primitives
+  - ratchet(?:s|ed|ing)?
+  - scaffolding
+  - substrates?
+  - vantage
+  - wedg(?:e|es|ed|ing)

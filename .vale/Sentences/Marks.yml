@@ -1,0 +1,13 @@
+extends: existence
+message: "Write this without '%s'. End the sentence earlier or split it in 2."
+level: error
+scope:
+  - paragraph
+  - list
+  - table.header
+  - table.cell
+  - blockquote
+nonword: true
+tokens:
+  - ':(?=\s|$)'
+  - ';'

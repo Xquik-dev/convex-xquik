@@ -1,0 +1,10 @@
+extends: existence
+message: "List the items instead of the range '%s'."
+level: error
+ignorecase: true
+tokens:
+  - and everything in between
+  - from (?:startups?|beginners?|hobbyists?|novices?|individuals?) to
+    (?:enterprises?|experts?|professionals?|pros|power users?)
+  - from (?:solo|small|indie) [a-z]+ to (?:enterprises?|large [a-z]+|global
+    [a-z]+)

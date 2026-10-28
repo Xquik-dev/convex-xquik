@@ -1,0 +1,14 @@
+extends: existence
+message: "Replace '%s' with a specific plan or fact."
+level: error
+ignorecase: true
+tokens:
+  - (?:the )?future (?:looks|is) bright
+  - a bright future
+  - only time will tell
+  - (?:the )?possibilities are (?:endless|limitless)
+  - 'exciting times(?: lie)? ahead'
+  - the sky's the limit
+  - (?:this|it) is (?:just|only) the beginning
+  - watch this space
+  - stay tuned

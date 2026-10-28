@@ -1,0 +1,79 @@
+extends: capitalization
+message: "Write '%s' in sentence case."
+level: error
+match: $sentence
+scope: heading
+exceptions:
+  - AI
+  - API
+  - APIs
+  - Actors?
+  - Apify
+  - Articles?
+  - ChatGPT
+  - Claude
+  - Codex
+  - Communities
+  - Community
+  - Community Notes
+  - CSV
+  - curl
+  - Cursor
+  - Discord
+  - DMs?
+  - Excel
+  - English
+  - Hong Kong
+  - Indian
+  - FAQ
+  - GIFs?
+  - GitHub
+  - HLS
+  - HTML
+  - I
+  - IDs?
+  - Idempotency-Key
+  - JavaScript
+  - JSON
+  - KOL
+  - Latin American
+  - Lists?
+  - MCP
+  - MP4
+  - NLWeb
+  - Node.js
+  - OpenAI
+  - Brazil
+  - Portugal
+  - Python
+  - RapidAPI
+  - REST
+  - SDKs?
+  - Slack
+  - Spain
+  - Spaces?
+  - Taiwan
+  - Telegram
+  - Top posts
+  - Twitter
+  - TypeScript
+  - URLs?
+  - With Replies
+  - WOEIDs?
+  - X
+  - Xquik
+  - 'X(?: \(Twitter\))?(?: [A-Z][a-z]+)+ (?:Downloader|Scraper)'
+  - 'X(?: \(Twitter\))?(?: [A-Z][a-z]+)+ (?:Analyzer|Classifier|Monitor|Tracker)'
+  - '\d+\.\d+\.\d+,? [a-z]+'
+  - '[a-z]+(?:[A-Z][a-z0-9]*)+'
+  - Media Downloader
+  - 'X Tweet Sentiment Analysis with AI'
+  - 'X \(Twitter\) Brand Monitoring with AI Analysis'
+  - 'X \(Twitter\) Stock & Crypto AI Trading Signals'
+  - Search API
+  - Trends API
+  - BPF
+  - CPU
+  - Fetch Metadata
+  - Object Storage
+  - WAL

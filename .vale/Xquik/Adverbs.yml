@@ -1,0 +1,27 @@
+extends: existence
+message: "Cut '%s', or give the number or a stronger verb."
+level: error
+ignorecase: true
+tokens:
+  - blazing(?:ly)?
+  - considerably
+  - drastically
+  - dramatically
+  - exceptionally
+  - extremely
+  - greatly
+  - hugely
+  - immensely
+  - incredibly
+  - insanely
+  - lightning[- ]fast
+  - massively
+  - really
+  - remarkably
+  - significantly
+  - substantially
+  - super(?= (?:fast|easy|simple|quick|cheap))
+  - tremendously
+  - truly
+  - vastly
+  - very

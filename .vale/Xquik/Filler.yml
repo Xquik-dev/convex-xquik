@@ -1,0 +1,23 @@
+extends: existence
+message: "Cut '%s' or say it in fewer words."
+level: error
+ignorecase: true
+tokens:
+  - as a matter of fact
+  - at the end of the day
+  - at this point in time
+  - due to the fact
+  - each and every
+  - first and foremost
+  - for (?:all )?intents and purposes
+  - for the purposes? of
+  - (?:has|have|had) the (?:ability|capability) to
+  - in a nutshell
+  - in order (?:to|for)
+  - (?:it is|it's) (?:important|crucial|essential) to (?:note|mention)
+  - it goes without saying
+  - needless to say
+  - simply put
+  - the fact of the matter
+  - when it comes to
+  - worth (?:noting|mentioning)

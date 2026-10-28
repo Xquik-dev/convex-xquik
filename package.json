@@ -63,8 +63,8 @@
   "scripts": {
     "generate": "node -e \"import('./scripts/registry.ts').then((registry) => registry.writeGenerated('.'))\"",
     "typecheck": "tsc --noEmit",
-    "lint": "eslint --max-warnings 0 .",
-    "type-coverage": "type-coverage --project tsconfig.json --strict --at-least 100 --detail --show-relative-path",
+    "lint": "eslint --max-warnings 0 $(git ls-files --cached --others --exclude-standard '*.ts' '*.js')",
+    "type-coverage": "type-coverage --project tsconfig.json --strict --at-least 100 --detail -- $(git ls-files --cached --others --exclude-standard '*.ts' '*.js')",
     "test": "vitest run --coverage",
     "mutation": "stryker run",
     "prepack": "convex codegen --component-dir ./src/component && rm -rf dist && tsc --project tsconfig.build.json && convex codegen",
@@ -92,5 +92,8 @@
     "typescript": "6.0.3",
     "typescript-eslint": "8.72.1",
     "vitest": "5.0.5"
+  },
+  "overrides": {
+    "qs": "6.17.0"
   }
 }

@@ -1,0 +1,38 @@
+extends: existence
+message: "Replace '%s' with a plain word."
+level: error
+ignorecase: true
+tokens:
+  - additionally
+  - crucial(?:ly)?
+  - cutting[- ]edge
+  - delv(?:e|es|ed|ing)
+  - effortless(?:ly)?
+  - embark(?:s|ed|ing)?
+  - empower(?:s|ed|ing|ment)?
+  - enduring
+  - enhanc(?:e|es|ed|ing|ement|ements)
+  - ever[- ](?:evolving|changing)
+  - foster(?:s|ed|ing)?
+  - furthermore
+  - game[- ]chang(?:er|ers|ing)
+  - garner(?:s|ed|ing)?
+  - holistic(?:ally)?
+  - interplay
+  - intricat(?:e|ely|cy|cies)
+  - (?:competitive|digital|evolving|changing|current|market|tech) landscapes?
+  - (?:the|today's) landscapes?(?! (?:mode|orientation|videos?|images?|photos?))
+  - meticulous(?:ly)?
+  - moreover
+  - myriad
+  - pivotal
+  - plethora
+  - seamless(?:ly)?
+  - showcas(?:e|es|ed|ing)
+  - streamlin(?:e|es|ed|ing)
+  - supercharg(?:e|es|ed|ing)
+  - tapestr(?:y|ies)
+  - testament
+  - underscor(?:e|es|ed|ing) (?:the|that|how|why|its|our|their|this|a|an)
+  - unleash(?:es|ed|ing)?
+  - vibrant
