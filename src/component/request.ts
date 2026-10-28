@@ -1,4 +1,5 @@
 import { ConvexError, v, type OptionalProperty, type Validator, type Value } from "convex/values";
+import { requireApiKey } from "./access.js";
 import data from "./registry.json" with { type: "json" };
 import { isList, isRecord, parseRegistry, type Field, type Operation, type Shape } from "./shape.js";
 import { json, toValue } from "./values.js";
@@ -200,16 +201,10 @@ async function failure(response: Response): Promise<ConvexError<Value>> {
 }
 
 export async function send(operation: Operation, args: Args, options: Options): Promise<Value> {
-  if (options.apiKey === undefined || options.apiKey === "") {
-    throw new ConvexError({
-      status: 401,
-      error: "missing_api_key",
-      message: "Set XQUIK_API_KEY in the Convex dashboard and pass it to the xquik component in convex.config.ts.",
-    });
-  }
+  const apiKey = requireApiKey(options.apiKey);
   const response = await fetch(url(operation, args), {
     method: operation.method,
-    headers: headers(operation, args, options.apiKey),
+    headers: headers(operation, args, apiKey),
     body: body(operation, args),
   });
   if (!response.ok) throw await failure(response);

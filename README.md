@@ -61,7 +61,7 @@ app.use(xquik, { httpPrefix: "/xquik/", env: { XQUIK_API_KEY: app.env.XQUIK_API_
 export default app;
 ```
 
-Set your key from the [Xquik dashboard](https://xquik.com/dashboard).
+Set your key from the [Xquik dashboard](https://xquik.com/dashboard). Every component function answers `missing_api_key` until you set it.
 
 ```bash
 npx convex env set XQUIK_API_KEY xq_your_key

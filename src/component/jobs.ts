@@ -1,6 +1,7 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { ConvexError, v, type Infer, type Value } from "convex/values";
 import { internal } from "./_generated/api.js";
+import { requireApiKey } from "./access.js";
 import type { Id } from "./_generated/dataModel.js";
 import { env, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server.js";
 import { pulledEvents } from "./delivery.js";
@@ -78,6 +79,7 @@ export const enqueue = mutation({
   },
   returns: v.id("jobs"),
   handler: async (ctx, { delayMs, ...job }): Promise<Id<"jobs">> => {
+    requireApiKey(env.XQUIK_API_KEY);
     find(job.operation);
     const existing =
       job.key === undefined
@@ -162,6 +164,7 @@ export const cancel = mutation({
   args: { jobId: v.id("jobs") },
   returns: v.null(),
   handler: async (ctx, { jobId }) => {
+    requireApiKey(env.XQUIK_API_KEY);
     const scheduledId = (await ctx.db.get("jobs", jobId))?.scheduledId;
     if (scheduledId === undefined) return null;
     await ctx.scheduler.cancel(scheduledId);
@@ -173,13 +176,17 @@ export const cancel = mutation({
 export const get = query({
   args: { jobId: v.id("jobs") },
   returns: v.union(v.null(), jobDoc),
-  handler: async (ctx, { jobId }) => await ctx.db.get("jobs", jobId),
+  handler: async (ctx, { jobId }) => {
+    requireApiKey(env.XQUIK_API_KEY);
+    return await ctx.db.get("jobs", jobId);
+  },
 });
 
 export const list = query({
   args: { paginationOpts: paginationOptsValidator, status: v.optional(jobStatus) },
   returns: paginationResultValidator(jobDoc),
   handler: async (ctx, { paginationOpts, status }) => {
+    requireApiKey(env.XQUIK_API_KEY);
     const jobs = ctx.db.query("jobs");
     const ordered = status === undefined ? jobs : jobs.withIndex("by_status", (q) => q.eq("status", status));
     return await ordered.order("desc").paginate(paginationOpts);

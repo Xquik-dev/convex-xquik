@@ -129,7 +129,7 @@ no_banned_patterns() {
 }
 
 lint_shell() {
-  "${tools}/shellcheck" --norc --check-sourced --enable=all --extended-analysis=true --severity=style bin/check-local
+  "${tools}/shellcheck" --norc --check-sourced --enable=all --extended-analysis=true --severity=style bin/check-local bin/release-local
 }
 
 check_links() {
