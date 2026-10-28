@@ -1,0 +1,9 @@
+extends: existence
+message: "State the point directly instead of '%s'."
+level: error
+ignorecase: true
+tokens:
+  - (?:is|are|was|were)n't (?:just|merely)
+  - more than (?:just|merely) (?:a|an|the)
+  - not (?:just|merely)
+  - not only [^.!?]*?\bbut

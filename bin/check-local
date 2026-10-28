@@ -1,0 +1,285 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Xquik Contributors
+# SPDX-License-Identifier: Apache-2.0
+set -euo pipefail
+
+script_directory="$(dirname "$0")"
+root="$(cd "${script_directory}/.." && pwd -P)"
+runner="$(git -C "${root}" config --get checklocal.runner || true)"
+if [[ -n "${runner}" && "${CHECK_LOCAL_HERE:-}" != 1 ]]; then
+  exec "${runner}" "${root}" "$@"
+fi
+
+cd "${root}"
+
+repository="Xquik-dev/convex-xquik"
+status_context="xquik-local-checks"
+reuse_version="6.2.0"
+
+post_commit_status=true
+for argument in "$@"; do
+  case "${argument}" in
+    --no-status) post_commit_status=false ;;
+    *)
+      echo "check-local: unknown option ${argument}. Use --no-status or no option." >&2
+      exit 2
+      ;;
+  esac
+done
+
+status_commit=""
+head_commit="$(git rev-parse HEAD)"
+tree_changes="$(git status --porcelain)"
+if ! ${post_commit_status}; then
+  echo "==> Commit status not posted because --no-status was passed."
+elif ! command -v gh >/dev/null; then
+  echo "==> Commit status not posted because the GitHub CLI is not installed."
+elif [[ -n "${tree_changes}" ]]; then
+  echo "==> Commit status not posted because the tree has uncommitted changes."
+elif ! gh api --silent "repos/${repository}/commits/${head_commit}" >/dev/null 2>&1; then
+  echo "==> Commit status not posted because GitHub does not have HEAD, or gh is signed out. Push first."
+else
+  status_commit="${head_commit}"
+fi
+
+post_status() {
+  local state="$1" description="${2:0:139}"
+  gh api --silent "repos/${repository}/statuses/${status_commit}" \
+    -f state="${state}" -f context="${status_context}" -f description="${description}" >/dev/null 2>&1 ||
+    echo "check-local: could not post the ${state} ${status_context} status. Run gh auth status." >&2
+}
+
+workspace="$(mktemp -d "${TMPDIR:-/tmp}/convex-xquik-check-local.XXXXXX")"
+current_check="Setup"
+passed=()
+summary=""
+
+on_exit() {
+  local status=$?
+  if [[ -n "${status_commit}" ]]; then
+    if ((status == 0)) && [[ -n "${summary}" ]]; then
+      post_status success "Passed ${summary}"
+    else
+      post_status failure "Failed at ${current_check}."
+    fi
+  fi
+  rm -rf -- "${workspace:?}"
+}
+trap on_exit EXIT
+
+if [[ -n "${status_commit}" ]]; then
+  echo "==> Posting a pending ${status_context} status to ${status_commit:0:12}."
+  post_status pending "Running the checks in bin/check-local."
+fi
+
+run_check() {
+  local label="$1" name="$2" next_step="$3"
+  shift 3
+  current_check="${name}"
+  echo "==> ${name}"
+  "$@" || {
+    local status=$?
+    echo "check-local: ${name} failed. ${next_step}" >&2
+    exit "${status}"
+  }
+  [[ -z "${label}" ]] || passed+=("${label}")
+}
+
+tools="${XDG_CACHE_HOME:-${HOME}/.cache}/convex-xquik/tools"
+kernel="$(uname -s)"
+machine="$(uname -m)"
+case "${kernel}-${machine}" in
+  Darwin-arm64) platform=darwin-arm64 ;;
+  Linux-x86_64) platform=linux-x64 ;;
+  *) platform="" ;;
+esac
+
+checksum=(shasum -a 256)
+command -v sha256sum >/dev/null && checksum=(sha256sum)
+
+install_tool() {
+  local name="$1" version url sha256 folder archive found
+  [[ -n "${platform}" ]] || {
+    echo "check-local: tools.json has no ${name} build for ${kernel} ${machine}." >&2
+    return 1
+  }
+  version="$(jq -r --arg name "${name}" '.[$name].version' tools.json)" || return
+  url="$(jq -r --arg name "${name}" --arg platform "${platform}" '.[$name].downloads[$platform].url' tools.json)" || return
+  sha256="$(jq -r --arg name "${name}" --arg platform "${platform}" '.[$name].downloads[$platform].sha256' tools.json)" ||
+    return
+  folder="${tools}/${name}-${version}-${platform}"
+  if [[ ! -f "${folder}/.verified" ]]; then
+    archive="${workspace}/${name}.tar.gz"
+    curl --fail --silent --show-error --location --retry 3 --output "${archive}" "${url//\{version\}/${version}}" ||
+      return
+    printf '%s  %s\n' "${sha256}" "${archive}" | "${checksum[@]}" --check --status || {
+      echo "check-local: the ${name} download does not match its SHA-256 in tools.json." >&2
+      return 1
+    }
+    rm -rf -- "${folder:?}" && mkdir -p "${folder}" && tar -xzf "${archive}" -C "${folder}" && touch "${folder}/.verified" ||
+      return
+  fi
+  found="$(find "${folder}" -type f -name "${name}" -perm -u+x -print -quit)" || return
+  [[ -n "${found}" ]] && ln -sf "${found}" "${tools}/${name}"
+}
+
+no_banned_patterns() {
+  git grep -nIP --untracked -f lint/banned-patterns.txt
+  (($? == 1))
+}
+
+lint_shell() {
+  "${tools}/shellcheck" --norc --check-sourced --enable=all --extended-analysis=true --severity=style bin/check-local
+}
+
+check_links() {
+  local listing
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.md')" || return
+  "${tools}/lychee" --offline --no-progress --include-fragments --files-from - <<<"${listing}"
+}
+
+lint_prose() {
+  local listing files=()
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.md')" || return
+  mapfile -t files <<<"${listing}"
+  "${tools}/vale" --output=line "${files[@]}"
+}
+
+generate_code() {
+  [[ -f .env.local ]] || CONVEX_AGENT_MODE=anonymous npx convex init >/dev/null || return
+  npx convex codegen --component-dir ./src/component && rm -rf dist && npx tsc --project tsconfig.build.json &&
+    npx convex codegen
+}
+
+registry_fresh() {
+  npm run --silent generate && git diff --exit-code -- src/component/registry.json src/component/operations.ts
+}
+
+format_check() {
+  local listing files=()
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js' '*.md')" || return
+  mapfile -t files <<<"${listing}"
+  npx prettier --check "${files[@]}"
+}
+
+lint_code() {
+  local listing files=()
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js')" || return
+  mapfile -t files <<<"${listing}"
+  npx eslint --max-warnings 0 "${files[@]}"
+}
+
+type_coverage() {
+  local listing files=()
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js')" || return
+  mapfile -t files <<<"${listing}"
+  npx type-coverage --project tsconfig.json --strict --at-least 100 --detail --show-relative-path -- "${files[@]}"
+}
+
+audit_dependencies() {
+  npm audit --audit-level=low && npm audit signatures
+}
+
+package_contents() {
+  local listing
+  listing="$(npm pack --dry-run --json --ignore-scripts)" || return
+  jq -e '.[0].files | map(.path) as $paths
+    | ["dist/component/convex.config.js", "dist/component/_generated/component.d.ts", "dist/component/registry.json",
+       "dist/client/index.js", "src/test.ts", "LICENSE", "README.md"] | all(. as $wanted | $paths | index($wanted))' \
+    <<<"${listing}" >/dev/null || {
+    echo "npm pack leaves out a file that apps import." >&2
+    return 1
+  }
+  ! jq -e '.[0].files | map(.path) | any(test("(^|/)\\.env"))' <<<"${listing}" >/dev/null
+}
+
+run_codeql() {
+  local source="${workspace}/codeql-source" database="${workspace}/codeql-database"
+  local results="${workspace}/codeql-results.sarif" diagnostic="js/diagnostics/extraction-errors"
+  local unread listing extracted skipped count
+  mkdir "${source}" &&
+    git ls-files -z --cached --others --exclude-standard | tar --null -T - -cf - | tar -xf - -C "${source}" &&
+    codeql database create "${database}" --language=javascript --build-mode=none --source-root="${source}" \
+      --threads=0 --quiet >/dev/null &&
+    codeql database analyze "${database}" codeql/javascript-queries:codeql-suites/javascript-security-extended.qls \
+      --download --format=sarif-latest --output="${results}" --threads=0 --quiet >/dev/null || return
+  jq -e --arg id "${diagnostic}" 'any(.runs[].tool["driver"].notifications[]?; .id == $id)' "${results}" >/dev/null || {
+    echo "The CodeQL suite did not run ${diagnostic}, so the scan cannot show that it read every file." >&2
+    return 1
+  }
+  unread="$(jq -r --arg id "${diagnostic}" '
+    [.runs[].invocations[]?.toolExecutionNotifications[]? | select(.descriptor.id == $id)
+      | .locations[0].physicalLocation | "\(.artifactLocation.uri) at line \(.region.startLine)"]
+    | unique | join(" and ")' "${results}")" || return
+  [[ -z "${unread}" ]] || {
+    echo "CodeQL could not parse ${unread}, so the scan is incomplete." >&2
+    return 1
+  }
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js')" || return
+  extracted="$(jq -r '.runs[].invocations[]?.toolExecutionNotifications[]?
+    | select(.descriptor.id == "js/diagnostics/successfully-extracted-files")
+    | .locations[0].physicalLocation.artifactLocation.uri' "${results}")" || return
+  skipped="$(awk -v extracted="${extracted}" '
+    BEGIN { count = split(extracted, names, "\n"); for (i = 1; i <= count; i++) read[names[i]] = 1 }
+    !($0 in read)' <<<"${listing}")" || return
+  [[ -z "${skipped}" ]] || {
+    printf 'CodeQL did not extract these files, so the scan did not check them.\n%s\n' "${skipped}" >&2
+    return 1
+  }
+  count="$(jq '[.runs[].results[]?] | length' "${results}")" || return
+  ((count == 0)) || {
+    jq -r '.runs[].results[] | .locations[0].physicalLocation as $at
+      | "\(.ruleId) \($at.artifactLocation.uri):\($at.region.startLine) \(.message.text)"' "${results}" >&2
+    echo "CodeQL found ${count} results." >&2
+    return 1
+  }
+  echo "CodeQL read every tracked TypeScript and JavaScript file and found no results."
+}
+
+run_check "" "Install the locked dependencies" "Run npm install and commit package-lock.json." \
+  npm ci --ignore-scripts --no-fund --no-audit
+mkdir -p "${tools}"
+for name in shellcheck gitleaks lychee vale; do
+  run_check "" "Install the pinned ${name}" "Check network access and tools.json, then rerun." install_tool "${name}"
+done
+run_check "bans" "Suppression and exclusion ban" \
+  "Remove each suppression or exclusion listed above and fix what it hid." no_banned_patterns
+run_check "shellcheck" "Shell lint with every optional shellcheck check" "Fix the shellcheck findings above." lint_shell
+run_check "REUSE" "Licensing with REUSE lint" \
+  "Give each file listed above a license and copyright in REUSE.toml or an SPDX header." \
+  uv tool run --from "reuse==${reuse_version}" reuse lint
+run_check "gitleaks" "Secret scan of every commit" "Remove each secret above and rotate it." \
+  "${tools}/gitleaks" git --no-banner --no-color --redact --verbose .
+run_check "lychee" "Link check of every Markdown file" "Fix each broken link or anchor above." check_links
+run_check "vale" "Prose lint of every Markdown file" "Rewrite each sentence Vale lists above." lint_prose
+run_check "" "Convex code generation on a local deployment" \
+  "Fix the Convex errors above, then rerun." generate_code
+run_check "fresh registry" "Operation registry matches openapi.json" \
+  "Run npm run generate and commit the result." registry_fresh
+run_check "format" "Format check of the TypeScript, JavaScript and Markdown files" \
+  "Run npx prettier --write on the files listed above." format_check
+run_check "types" "Type check" "Fix the type errors above." npx tsc --noEmit --project tsconfig.json
+run_check "lint" "Type-aware lint with every Convex rule" "Fix the lint findings above." lint_code
+run_check "100% typed" "Type coverage" "Give each value listed above a type without any." type_coverage
+run_check "audit" "Dependency audit and registry signatures" "Upgrade each package named above, then rerun." \
+  audit_dependencies
+run_check "100% coverage" "Tests with 100% line, branch, function and statement coverage" \
+  "Fix the failing tests or test the lines listed above." npx vitest run --coverage
+run_check "100% mutation score" "Mutation testing" "Write a test that kills each surviving mutant above." \
+  npx stryker run
+run_check "package" "Package contents" "Fix the files list in package.json." package_contents
+run_check "CodeQL" "Static analysis with the CodeQL security-extended queries" \
+  "Fix the CodeQL findings above, then rerun." run_codeql
+
+current_check="Final tree check"
+if [[ -n "${status_commit}" ]]; then
+  head_commit="$(git rev-parse HEAD)"
+  tree_changes="$(git status --porcelain)"
+  [[ "${head_commit}" == "${status_commit}" && -z "${tree_changes}" ]] || {
+    echo "check-local: the tree changed during the checks. Commit or remove the changes, then rerun." >&2
+    exit 1
+  }
+fi
+printf -v joined '%s, ' "${passed[@]}"
+summary="${joined%, }."
+echo "All local checks passed. They were ${summary}"

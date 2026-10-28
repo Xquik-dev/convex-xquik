@@ -1,0 +1,16 @@
+extends: existence
+message: "Name the source instead of '%s', or cut the claim."
+level: error
+ignorecase: true
+tokens:
+  - (?:experts|critics|observers|analysts|researchers)
+    (?:say|believe|argue|claim)
+  - (?:experts|critics|observers|analysts|researchers) (?:agree|suggest|think)
+  - industry (?:reports|experts|observers|insiders) (?:say|suggest|show)
+  - (?:studies|research|surveys) (?:show|shows|suggest|suggests)
+  - (?:studies|research|surveys) (?:have|has) shown
+  - it is (?:widely|generally|commonly|often) (?:believed|accepted|known)
+  - it is (?:widely|generally|commonly|often) (?:said|thought|reported)
+  - (?:some|many) (?:people|users|developers) (?:say|believe|argue|claim)
+  - according to (?:experts|reports|many|some|sources)
+  - (?:sources|insiders) say

@@ -1,0 +1,9 @@
+extends: existence
+message: "Write 'is' or 'has' instead of '%s'."
+level: error
+ignorecase: true
+tokens:
+  - boast(?:s|ed|ing)?
+  - featur(?:es|ing) (?:a|an)
+  - serv(?:e|es|ed|ing) as
+  - st(?:and|ands|ood|anding) as

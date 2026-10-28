@@ -1,0 +1,21 @@
+extends: existence
+message: "Cut '%s' or give it its own sentence."
+level: error
+ignorecase: true
+tokens:
+  - (?<=, )cementing
+  - (?<=, )contributing to
+  - (?<=, )demonstrating
+  - (?<=, )emphasi[sz]ing
+  - (?<=, )ensuring
+  - (?<=, )fostering
+  - (?<=, )highlighting
+  - (?<=, )illustrating
+  - (?<=, )marking a
+  - (?<=, )paving the way
+  - (?<=, )reflecting
+  - (?<=, )showcasing
+  - (?<=, )signall?ing
+  - (?<=, )solidifying
+  - (?<=, )symboli[sz]ing
+  - (?<=, )underscoring

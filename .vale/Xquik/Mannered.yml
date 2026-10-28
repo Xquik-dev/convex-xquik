@@ -1,0 +1,22 @@
+extends: existence
+message: "Say it literally instead of '%s'."
+level: error
+ignorecase: true
+tokens:
+  - a deep dive
+  - at (?:its|the) core
+  - boils? down to
+  - double[- ]edged sword
+  - heavy lifting
+  - here's the thing
+  - in today's (?:world|age|digital|fast-paced)
+  - it's no secret
+  - low[- ]hanging fruit
+  - make no mistake
+  - move the needle
+  - (?:rides?|riding|rode) along
+  - secret sauce
+  - silver bullet
+  - the heart of (?:the|our|your|every|any)
+  - (?:to|at) the next level
+  - under the hood

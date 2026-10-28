@@ -1,0 +1,6 @@
+extends: existence
+message: "Remove the emoji '%s'."
+level: error
+nonword: true
+tokens:
+  - '[🀀-🫿☀-☄☇-⛿✀-✒✙-➿⬀-⯿]'

@@ -1,0 +1,19 @@
+extends: existence
+message: "Remove the chatbot phrase '%s'."
+level: error
+ignorecase: true
+tokens:
+  - absolutely(?=!)
+  - certainly(?=!)
+  - don't hesitate to
+  - feel free to
+  - great question
+  - (?:happy|glad) to help
+  - (?:I|we)(?:'d| would) be (?:happy|glad) to
+  - (?:I |we )?hope (?:this|that|it) helps
+  - let's dive
+  - let (?:me|us) know if
+  - of course
+  - rest assured
+  - without further ado
+  - you're absolutely right

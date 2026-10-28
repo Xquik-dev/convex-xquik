@@ -1,0 +1,21 @@
+extends: existence
+message: "Use a plain word instead of '%s'."
+level: error
+ignorecase: true
+tokens:
+  - aforementioned
+  - ascertain(?:s|ed|ing)?
+  - commenc(?:e|es|ed|ing|ement)
+  - endeavou?r(?:s|ed|ing)?
+  - facilitat(?:e|es|ed|ing|ion)
+  - henceforth
+  - in excess of
+  - in lieu of
+  - in the event (?:that|of)
+  - leverag(?:e|es|ed|ing) (?:the|our|your|its|their|this|these|those)
+  - leverag(?:e|es|ed|ing) (?:a|an|existing|Xquik|AI|data)
+  - numerous
+  - prior to
+  - utili[sz](?:e|es|ed|ing|ation)
+  - whereby
+  - with the exception of

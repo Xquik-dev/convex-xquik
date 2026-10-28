@@ -1,0 +1,15 @@
+# Xquik/Marks.yml reads headings. This reads the rest of a page's prose, for
+# the files `.vale.ini` names. Vale skips code spans & code blocks.
+extends: existence
+message: "Write this without '%s'. End the sentence earlier or split it in 2."
+level: error
+scope:
+  - paragraph
+  - list
+  - table.header
+  - table.cell
+  - blockquote
+nonword: true
+tokens:
+  - ':(?=\s|$)'
+  - ';'

@@ -1,0 +1,8 @@
+extends: existence
+message: "Spell out '%s' in words."
+level: error
+nonword: true
+tokens:
+  - '[←-⇿]'
+  - '(?<=\s)(?:->|=>|<-)(?=\s)'
+  - '\b(?:w/o?|b/c|w\.r\.t\.)(?=\s)'

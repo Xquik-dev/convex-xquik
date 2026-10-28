@@ -1,0 +1,9 @@
+extends: existence
+message: "Hedge once. Write 'may' instead of '%s', or state the fact."
+level: error
+ignorecase: true
+tokens:
+  - (?:could|might|may|can) (?:potentially|possibly|perhaps|conceivably)
+  - (?:potentially|possibly|perhaps|conceivably) (?:could|might|may)
+  - it (?:could|might|may) be (?:argued|said|suggested)
+  - (?:seems|appears) to (?:possibly|potentially|perhaps)

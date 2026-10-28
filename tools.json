@@ -1,0 +1,58 @@
+{
+  "gitleaks": {
+    "version": "8.30.1",
+    "binary": "gitleaks",
+    "downloads": {
+      "darwin-arm64": {
+        "sha256": "b40ab0ae55c505963e365f271a8d3846efbc170aa17f2607f13df610a9aeb6a5",
+        "url": "https://github.com/gitleaks/gitleaks/releases/download/v{version}/gitleaks_{version}_darwin_arm64.tar.gz"
+      },
+      "linux-x64": {
+        "sha256": "551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb",
+        "url": "https://github.com/gitleaks/gitleaks/releases/download/v{version}/gitleaks_{version}_linux_x64.tar.gz"
+      }
+    }
+  },
+  "lychee": {
+    "version": "0.24.2",
+    "binary": "lychee",
+    "downloads": {
+      "darwin-arm64": {
+        "sha256": "c9d3740ea2d891854d37116c9fba840f37b6e7c89d330e7db84ac333631c4977",
+        "url": "https://github.com/lycheeverse/lychee/releases/download/lychee-v{version}/lychee-aarch64-apple-darwin.tar.gz"
+      },
+      "linux-x64": {
+        "sha256": "73657a111819a30c47c08352896796f23d64e4eb2b3ed39b6d32149241566fc5",
+        "url": "https://github.com/lycheeverse/lychee/releases/download/lychee-v{version}/lychee-x86_64-unknown-linux-musl.tar.gz"
+      }
+    }
+  },
+  "shellcheck": {
+    "version": "0.11.0",
+    "binary": "shellcheck",
+    "downloads": {
+      "darwin-arm64": {
+        "sha256": "339b930feb1ea764467013cc1f72d09cd6b869ebf1013296ba9055ab2ffbd26f",
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v{version}/shellcheck-v{version}.darwin.aarch64.tar.gz"
+      },
+      "linux-x64": {
+        "sha256": "b7af85e41cc99489dcc21d66c6d5f3685138f06d34651e6d34b42ec6d54fe6f6",
+        "url": "https://github.com/koalaman/shellcheck/releases/download/v{version}/shellcheck-v{version}.linux.x86_64.tar.gz"
+      }
+    }
+  },
+  "vale": {
+    "version": "3.24.0",
+    "binary": "vale",
+    "downloads": {
+      "darwin-arm64": {
+        "sha256": "87b513f26499f6657c15cf7175ba5b058a7c1ff2bb2d4e07265db2dd43451e44",
+        "url": "https://github.com/vale-cli/vale/releases/download/v{version}/vale_{version}_macOS_arm64.tar.gz"
+      },
+      "linux-x64": {
+        "sha256": "867534ddb678abca7f214bc4706ead0922bd5252ffe8035fc227013f66c8b214",
+        "url": "https://github.com/vale-cli/vale/releases/download/v{version}/vale_{version}_Linux_64-bit.tar.gz"
+      }
+    }
+  }
+}
