@@ -1,0 +1,96 @@
+{
+  "name": "convex-xquik",
+  "version": "0.1.0",
+  "description": "Convex component for X (Twitter) data & actions through Xquik, with signed webhooks & live queries. Not affiliated with X Corp.",
+  "license": "Apache-2.0",
+  "author": {
+    "name": "Xquik",
+    "email": "support@xquik.com",
+    "url": "https://xquik.com"
+  },
+  "homepage": "https://docs.xquik.com/guides/convex",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Xquik-dev/convex-xquik.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Xquik-dev/convex-xquik/issues"
+  },
+  "keywords": [
+    "convex",
+    "convex-component",
+    "component",
+    "twitter",
+    "twitter-api",
+    "x-api",
+    "twitter-scraper",
+    "tweets",
+    "webhooks",
+    "xquik"
+  ],
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "files": [
+    "dist",
+    "src"
+  ],
+  "exports": {
+    "./package.json": "./package.json",
+    ".": {
+      "types": "./dist/client/index.d.ts",
+      "default": "./dist/client/index.js"
+    },
+    "./test": "./src/test.ts",
+    "./_generated/component.js": {
+      "types": "./dist/component/_generated/component.d.ts"
+    },
+    "./_generated/component": {
+      "types": "./dist/component/_generated/component.d.ts"
+    },
+    "./convex.config.js": {
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
+    },
+    "./convex.config": {
+      "types": "./dist/component/convex.config.d.ts",
+      "default": "./dist/component/convex.config.js"
+    }
+  },
+  "types": "./dist/client/index.d.ts",
+  "module": "./dist/client/index.js",
+  "scripts": {
+    "generate": "node -e \"import('./scripts/registry.ts').then((registry) => registry.writeGenerated('.'))\"",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint --max-warnings 0 .",
+    "type-coverage": "type-coverage --project tsconfig.json --strict --at-least 100 --detail --show-relative-path",
+    "test": "vitest run --coverage",
+    "mutation": "stryker run",
+    "prepack": "convex codegen --component-dir ./src/component && rm -rf dist && tsc --project tsconfig.build.json && convex codegen",
+    "bundle": "rm -rf dist && tsc --project tsconfig.build.json"
+  },
+  "peerDependencies": {
+    "convex": "^1.48.0"
+  },
+  "devDependencies": {
+    "@convex-dev/eslint-plugin": "5.0.0",
+    "@edge-runtime/vm": "5.0.0",
+    "@eslint/js": "10.0.1",
+    "@stryker-mutator/core": "10.1.1",
+    "@stryker-mutator/typescript-checker": "10.1.1",
+    "@stryker-mutator/vitest-runner": "10.1.1",
+    "@types/node": "26.6.5",
+    "@typescript-eslint/utils": "8.72.1",
+    "@vitest/coverage-v8": "5.0.5",
+    "convex": "1.48.0",
+    "convex-test": "0.0.66",
+    "eslint": "10.13.0",
+    "globals": "17.13.0",
+    "prettier": "3.9.10",
+    "type-coverage": "2.30.4",
+    "typescript": "6.0.3",
+    "typescript-eslint": "8.72.1",
+    "vitest": "5.0.5"
+  }
+}
