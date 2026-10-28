@@ -4,6 +4,7 @@ import { internal } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.js";
 import type { MutationCtx } from "./_generated/server.js";
 import { action, env, internalMutation, internalQuery, mutation, query } from "./_generated/server.js";
+import { requireApiKey } from "./access.js";
 import { NONCE_TTL_MS } from "./delivery.js";
 import { eventFields, type EventFields } from "./values.js";
 import { argument, find, send } from "./request.js";
@@ -68,10 +69,11 @@ export const create = action({
     ctx,
     { eventTypes, onEvent },
   ): Promise<{ endpointId: Id<"endpoints">; url: string; webhookId: string }> => {
+    const apiKey = requireApiKey(env.XQUIK_API_KEY);
     const handle = handleArgs(onEvent);
     const token = crypto.randomUUID();
     const url = urlOf(token);
-    const created = await send(createWebhook, { eventTypes, url }, { apiKey: env.XQUIK_API_KEY, streamMs: STREAM_MS });
+    const created = await send(createWebhook, { eventTypes, url }, { apiKey, streamMs: STREAM_MS });
     const { id, secret } = isRecord(created) ? created : {};
     if (typeof id !== "string" || typeof secret !== "string") {
       throw new ConvexError({
@@ -89,6 +91,7 @@ export const add = mutation({
   args: { secret: v.string(), onEvent: v.optional(v.string()) },
   returns: v.object({ endpointId: v.id("endpoints"), url: v.string() }),
   handler: async (ctx, { secret, onEvent }) => {
+    requireApiKey(env.XQUIK_API_KEY);
     const handle = handleArgs(onEvent);
     const token = crypto.randomUUID();
     const endpointId = await ctx.db.insert("endpoints", { token, secret, ...handle });
@@ -100,6 +103,7 @@ export const list = query({
   args: {},
   returns: v.array(endpointView),
   handler: async (ctx) => {
+    requireApiKey(env.XQUIK_API_KEY);
     const endpoints = await ctx.db.query("endpoints").take(100);
     return endpoints.map(({ _id, token, webhookId, testedAt }) => ({
       endpointId: _id,
@@ -139,9 +143,10 @@ export const remove = action({
   args: { endpointId: v.id("endpoints") },
   returns: v.null(),
   handler: async (ctx, { endpointId }): Promise<null> => {
+    const apiKey = requireApiKey(env.XQUIK_API_KEY);
     const webhookId = await ctx.runQuery(internal.webhooks.webhookOf, { endpointId });
     if (webhookId !== null) {
-      await send(find("deleteWebhook"), { id: webhookId }, { apiKey: env.XQUIK_API_KEY, streamMs: STREAM_MS });
+      await send(find("deleteWebhook"), { id: webhookId }, { apiKey, streamMs: STREAM_MS });
     }
     await ctx.runMutation(internal.webhooks.drop, { endpointId });
     return null;

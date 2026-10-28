@@ -9,7 +9,7 @@ bin/check-local
 `bin/check-local` runs every check in this order. It stops at the first failure and says what to fix.
 
 1. `npm ci` installs the locked dependencies.
-2. `git grep` bans each pattern in `lint/banned-patterns.txt` in every file. The list covers every suppression comment, exclusion key and skipped test.
+2. `git grep` bans each pattern in `lint/banned-patterns.txt` in every file. The list covers every suppression comment, exclusion key, rule set to off and skipped test.
 3. shellcheck lints `bin/check-local` with every optional check turned on.
 4. REUSE 6.2.0 checks that every file has a license and a copyright.
 5. gitleaks scans every commit for secrets.
@@ -19,7 +19,7 @@ bin/check-local
 9. `npm run generate` must leave `src/component/registry.json` and `src/component/operations.ts` unchanged.
 10. Prettier checks the format of every TypeScript, JavaScript and Markdown file.
 11. `tsc` checks the types with strict compiler options, including the JavaScript config files.
-12. ESLint runs the strict type-checked rules and every Convex rule. It bans `any`, type assertions and non-null assertions. Component functions skip the access control rule, because only the installing app can call them.
+12. ESLint runs the strict type-checked rules and every Convex rule on every file. It bans `any`, type assertions and non-null assertions. Each public component function starts with `requireApiKey`, so it answers only a deployment that set its Xquik key.
 13. type-coverage needs every value of every tracked file typed without `any`.
 14. `npm audit` checks the dependencies, and `npm audit signatures` checks their registry signatures.
 15. Vitest runs every test. The tests must run every line, branch, function and statement of every tracked source file.

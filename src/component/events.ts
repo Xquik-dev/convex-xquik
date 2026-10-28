@@ -1,6 +1,7 @@
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import { v } from "convex/values";
-import { query } from "./_generated/server.js";
+import { env, query } from "./_generated/server.js";
+import { requireApiKey } from "./access.js";
 import schema from "./schema.js";
 
 export const eventDoc = schema.tables.events.validator.extend({
@@ -15,6 +16,7 @@ export const list = query({
   },
   returns: paginationResultValidator(eventDoc),
   handler: async (ctx, { paginationOpts, filter }) => {
+    requireApiKey(env.XQUIK_API_KEY);
     const events = ctx.db.query("events");
     const ordered =
       filter === undefined
@@ -29,9 +31,11 @@ export const list = query({
 export const get = query({
   args: { streamEventId: v.string() },
   returns: v.union(v.null(), eventDoc),
-  handler: async (ctx, { streamEventId }) =>
-    await ctx.db
+  handler: async (ctx, { streamEventId }) => {
+    requireApiKey(env.XQUIK_API_KEY);
+    return await ctx.db
       .query("events")
       .withIndex("by_stream_event", (q) => q.eq("streamEventId", streamEventId))
-      .unique(),
+      .unique();
+  },
 });

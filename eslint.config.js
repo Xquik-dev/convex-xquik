@@ -32,12 +32,6 @@ const config = [
       "@typescript-eslint/switch-exhaustiveness-check": "error",
     },
   },
-  {
-    // Only the installing app can call component functions, and components have no ctx.auth.
-    // https://docs.convex.dev/components/authoring#the-component-api
-    files: ["src/component/**"],
-    rules: { "@convex-dev/require-access-control": "off" },
-  },
 ];
 
 export default config;
