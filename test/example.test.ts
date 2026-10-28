@@ -96,9 +96,9 @@ describe("the example app", () => {
     expect(webhookId).toBe("42");
     expect(JSON.parse(recorded[0]?.body ?? "")).toEqual({ eventTypes: ["tweet.new", "tweet.reply"], url });
     const event = { streamEventId: "9001", eventType: "tweet.new", occurredAt: 1, data: null };
-    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     expect(await t.mutation(internal.example.onEvent, { event })).toBeNull();
-    expect(info).toHaveBeenCalledExactlyOnceWith("Stored Xquik event 9001 of type tweet.new");
+    const rows = await t.run(async (ctx) => await ctx.db.query("notifications").take(5));
+    expect(rows.map(({ streamEventId, eventType }) => [streamEventId, eventType])).toEqual([["9001", "tweet.new"]]);
   });
 
   test("the client registers webhooks with and without an app handler", async () => {

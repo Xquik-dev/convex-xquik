@@ -3,8 +3,7 @@ import type schema from "../src/component/schema.js";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../src/component/_generated/api.js";
 import crons from "../src/component/crons.js";
-import { check, NONCE_TTL_MS, pulledEvents, readDelivery, TOLERANCE_MS } from "../src/component/delivery.js";
-import { PURGE_BATCH } from "../src/component/webhooks.js";
+import { check, pulledEvents, readDelivery } from "../src/component/delivery.js";
 import {
   componentTest,
   delivery,
@@ -80,11 +79,11 @@ describe("the webhook receiver", () => {
       401,
       "stale timestamp",
     ]);
-    expect(await post(sign(body, { timestamp: String(Date.now() - TOLERANCE_MS - 1000) }))).toEqual([
+    expect(await post(sign(body, { timestamp: String(Date.now() - 300_000 - 1000) }))).toEqual([
       401,
       "stale timestamp",
     ]);
-    expect(await post(sign(body, { timestamp: String(Date.now() + TOLERANCE_MS + 1000) }))).toEqual([
+    expect(await post(sign(body, { timestamp: String(Date.now() + 300_000 + 1000) }))).toEqual([
       401,
       "stale timestamp",
     ]);
@@ -142,6 +141,28 @@ describe("the webhook receiver", () => {
     expect(scheduled).toHaveLength(1);
   });
 
+  test("runs each endpoint's handler once, even for an event a pull stored first", async () => {
+    vi.useFakeTimers();
+    const t = componentTest();
+    await t.run(async (ctx) => {
+      await ctx.db.insert("events", { streamEventId: "1", eventType: "tweet.new", occurredAt: 1, data: null });
+    });
+    const paths: string[] = [];
+    for (const handle of ["function://;webhooks:purge", "function://;webhooks:list"]) {
+      const { url } = await t.mutation(api.webhooks.add, { secret: SECRET, onEvent: handle });
+      paths.push(new URL(url).pathname.replace("/xquik", ""));
+    }
+    const answers: string[] = [];
+    for (const path of [...paths, ...paths]) {
+      answers.push(await (await t.fetch(path, { method: "POST", ...sign(delivery("tweet.new", "1")) })).text());
+    }
+    expect(answers).toEqual(["stored", "stored", "duplicate", "duplicate"]);
+    const scheduled = await t.run(async (ctx) => await ctx.db.system.query("_scheduled_functions").take(10));
+    expect(scheduled.map((job) => job.name).sort()).toEqual(["webhooks:list", "webhooks:purge"]);
+    const page = await t.query(api.events.list, { paginationOpts: { numItems: 10, cursor: null } });
+    expect(page.page).toHaveLength(1);
+  });
+
   test("stores an event whose endpoint was removed during the delivery", async () => {
     const t = componentTest();
     const { endpointId } = await t.mutation(api.webhooks.add, { secret: SECRET });
@@ -166,12 +187,12 @@ describe("the webhook receiver", () => {
     const t = componentTest();
     const { endpointId } = await t.mutation(api.webhooks.add, { secret: SECRET });
     await t.run(async (ctx) => {
-      for (let index = 0; index <= PURGE_BATCH; index += 1) {
+      for (let index = 0; index <= 256; index += 1) {
         await ctx.db.insert("nonces", { endpointId, nonce: String(index), expiresAt: Date.now() - 1 });
       }
-      await ctx.db.insert("nonces", { endpointId, nonce: "fresh", expiresAt: Date.now() + NONCE_TTL_MS });
+      await ctx.db.insert("nonces", { endpointId, nonce: "fresh", expiresAt: Date.now() + 600_000 });
     });
-    expect(await t.mutation(internal.webhooks.purge, {})).toBe(PURGE_BATCH);
+    expect(await t.mutation(internal.webhooks.purge, {})).toBe(256);
     vi.runAllTimers();
     await t.finishInProgressScheduledFunctions();
     const left = await t.run(async (ctx) => await ctx.db.query("nonces").take(10));
@@ -278,7 +299,7 @@ describe("delivery parsing", () => {
     const importKey = vi.spyOn(crypto.subtle, "importKey");
     const signed = sign("{}");
     await check(SECRET, new Headers(signed.headers), new TextEncoder().encode(signed.body).buffer, Date.now());
-    expect(importKey.mock.calls.map((call) => [call[3], call[4]])).toEqual([[false, ["verify"]]]);
+    expect(importKey).toHaveBeenCalledExactlyOnceWith("raw", expect.anything(), expect.anything(), false, ["verify"]);
     importKey.mockRestore();
   });
 

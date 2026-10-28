@@ -24,6 +24,10 @@ export default defineSchema({
   })
     .index("by_nonce", ["endpointId", "nonce"])
     .index("by_expiry", ["expiresAt"]),
+  receipts: defineTable({
+    endpointId: v.id("endpoints"),
+    streamEventId: v.string(),
+  }).index("by_event", ["endpointId", "streamEventId"]),
   events: defineTable(eventFields)
     .index("by_stream_event", ["streamEventId"])
     .index("by_occurred", ["occurredAt"])

@@ -80,7 +80,18 @@ export const enqueue = mutation({
             .query("jobs")
             .withIndex("by_key", (q) => q.eq("key", job.key).eq("status", "scheduled"))
             .first();
-    if (existing !== null) return existing._id;
+    if (existing !== null) {
+      const scheduled =
+        existing.scheduledId === undefined
+          ? null
+          : await ctx.db.system.get("_scheduled_functions", existing.scheduledId);
+      if (scheduled?.state.kind === "pending" || scheduled?.state.kind === "inProgress") return existing._id;
+      await ctx.db.patch("jobs", existing._id, {
+        status: "failed",
+        scheduledId: undefined,
+        error: { message: "The job stopped before it finished, so this call replaced it." },
+      });
+    }
     if ((job.everyMs ?? MIN_EVERY_MS) < MIN_EVERY_MS) {
       throw new ConvexError({
         status: 400,

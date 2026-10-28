@@ -33,7 +33,7 @@ const config = [
     },
   },
   {
-    // Component functions are reachable only from the installing app, which has no ctx.auth to pass down.
+    // Only the installing app can call component functions, and components have no ctx.auth.
     // https://docs.convex.dev/components/authoring#the-component-api
     files: ["src/component/**"],
     rules: { "@convex-dev/require-access-control": "off" },

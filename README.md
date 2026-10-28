@@ -109,9 +109,9 @@ export const onEvent = internalMutation({
 });
 ```
 
-The component creates the Xquik webhook at `https://<deployment>.convex.site/xquik/webhooks/<token>`. It keeps the signing secret in its own table. Each delivery must carry a valid `X-Xquik-Signature` & a timestamp within 5 minutes. A replayed nonce gets a 401. A retry with the same `streamEventId` is stored once. The `webhook.test` alert gets a 200 & sets `testedAt` on the endpoint.
+The component creates the Xquik webhook at `https://<deployment>.convex.site/xquik/webhooks/<token>`. It keeps the signing secret in its own table. Each delivery must carry a valid `X-Xquik-Signature` & a timestamp within 5 minutes. A replayed nonce gets a 401. A retry with the same `streamEventId` is stored once, and your handler runs once per endpoint. The `webhook.test` alert gets a 200 & sets `testedAt` on the endpoint.
 
-Registered a webhook somewhere else? Call `xquik.addWebhook(ctx, { secret })` from a mutation & paste the URL it returns.
+For a webhook made elsewhere, call `xquik.addWebhook(ctx, { secret })` from a mutation & paste the URL it returns.
 
 ## Show events live
 
@@ -137,11 +137,11 @@ Use it with `usePaginatedQuery(api.x.events, {}, { initialNumItems: 20 })`. Pass
 await xquik.schedule(ctx, "listEvents", { limit: 100 }, { key: "events", everyMs: 5 * 60 * 1000 });
 ```
 
-A job with a `key` runs once at a time, so calling this again returns the same job. Reads & writes that take an `Idempotency-Key` retry 429 & 5xx answers up to 5 times. The component fills the key for you. Scheduled `listEvents` jobs store their events with the webhook events. Read a job with `components.xquik.jobs.get` & stop it with `components.xquik.jobs.cancel`.
+A job with a `key` runs once at a time, so calling this again returns the same job. A read, or a write that takes an `Idempotency-Key`, makes up to 5 attempts on a 429, a 5xx or a network error. The component fills the key for you. Scheduled `listEvents` jobs store their events with the webhook events. Read a job with `components.xquik.jobs.get` & stop it with `components.xquik.jobs.cancel`.
 
 ## Keep credits safe
 
-Component functions run only from your backend. Wrap them in internal functions, or check the caller's identity & rate in each public function that spends credits. The example app keeps every credit-spending function internal.
+Component functions run only from your backend. Wrap them in internal functions, or check the caller's identity & rate limit in each public function that spends credits. The example app keeps every credit-spending function internal.
 
 ## Test your app
 

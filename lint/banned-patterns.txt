@@ -10,7 +10,7 @@
 [v]ale\s+off
 (?:[c]odeql|[l]gtm)\[
 --[n]o-(?:verify|check)
-\b(?:test|it|describe)\.(?:[s]kip|[o]nly|[t]odo)\b
+\b(?:test|it|describe|suite)\.(?:[s]kip|[o]nly|[t]odo|[s]kipIf|[r]unIf|[f]ails)\b
 (?<![\w/.-])(?:[e]xclude|[i]gnores?|[i]gnoreFiles|[i]gnorePatterns|[s]kipLibCheck|[e]xcludedMutations|[i]gnoreStatic)"?\s*:\s*[[{tf]
 [p]aths-ignore
 (*UTF)\x{2014}

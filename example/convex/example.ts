@@ -53,9 +53,9 @@ export const watch = internalAction({
 export const onEvent = internalMutation({
   args: { event: eventFields },
   returns: v.null(),
-  handler: (_ctx, { event }) => {
-    console.info(`Stored Xquik event ${event.streamEventId} of type ${event.eventType}`);
-    return Promise.resolve(null);
+  handler: async (ctx, { event }) => {
+    await ctx.db.insert("notifications", { streamEventId: event.streamEventId, eventType: event.eventType });
+    return null;
   },
 });
 

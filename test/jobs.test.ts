@@ -3,7 +3,7 @@ import type { TestConvex } from "convex-test";
 import type schema from "../src/component/schema.js";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { api, internal } from "../src/component/_generated/api.js";
-import { failed, MAX_ATTEMPTS, MIN_EVERY_MS, plan } from "../src/component/jobs.js";
+import { failed, plan } from "../src/component/jobs.js";
 import { find } from "../src/component/request.js";
 import { componentTest, rejection, stubFetch } from "./helpers.js";
 
@@ -44,7 +44,7 @@ describe("jobs", () => {
       data: { id: "1" },
     };
     stubFetch(() => Response.json({ events: [event, event, { id: 8 }], hasMore: false }));
-    const jobId = await t.mutation(api.jobs.enqueue, { operation: "listEvents", args: {}, everyMs: MIN_EVERY_MS });
+    const jobId = await t.mutation(api.jobs.enqueue, { operation: "listEvents", args: {}, everyMs: 60_000 });
     for (let run = 0; run < 2; run += 1) {
       vi.runOnlyPendingTimers();
       await settle(t);
@@ -63,11 +63,11 @@ describe("jobs", () => {
     const t = componentTest();
     const recorded = stubFetch(() => Response.json({ error: "busy" }, { status: 503 }));
     const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "elonmusk" } });
-    for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
       vi.runOnlyPendingTimers();
       await settle(t);
     }
-    expect(recorded).toHaveLength(MAX_ATTEMPTS);
+    expect(recorded).toHaveLength(5);
     expect(await t.query(api.jobs.get, { jobId })).toMatchObject({ status: "failed", runs: 1, error: { status: 503 } });
   });
 
@@ -132,6 +132,40 @@ describe("jobs", () => {
     await t.mutation(api.jobs.cancel, { jobId: first });
     const next = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "NASA" }, key: "profile" });
     expect(new Set([first, other, next]).size).toBe(3);
+  });
+
+  test("returns the running job for its key and replaces a keyed job that stopped", async () => {
+    vi.useFakeTimers();
+    const t = componentTest();
+    const args = { operation: "getUser", args: { id: "elonmusk" }, key: "profile" };
+    const first = await t.mutation(api.jobs.enqueue, args);
+    const during: string[] = [];
+    stubFetch(async () => {
+      during.push(await t.mutation(api.jobs.enqueue, args));
+      return Response.json({ id: "1" });
+    });
+    vi.runAllTimers();
+    await t.finishInProgressScheduledFunctions();
+    expect(during).toEqual([first]);
+    const stuck = await t.run(async (ctx) => {
+      const jobId = await ctx.db.insert("jobs", { ...args, status: "scheduled", attempts: 0, runs: 0 });
+      const scheduledId = await ctx.scheduler.runAfter(0, internal.jobs.run, { jobId });
+      await ctx.scheduler.cancel(scheduledId);
+      await ctx.db.patch("jobs", jobId, { scheduledId });
+      return jobId;
+    });
+    const unscheduled = await t.run(
+      async (ctx) => await ctx.db.insert("jobs", { ...args, key: "other", status: "scheduled", attempts: 0, runs: 0 }),
+    );
+    const replaced = await t.mutation(api.jobs.enqueue, args);
+    const other = await t.mutation(api.jobs.enqueue, { ...args, key: "other" });
+    expect(new Set([stuck, replaced, unscheduled, other]).size).toBe(4);
+    for (const jobId of [stuck, unscheduled]) {
+      expect(await t.query(api.jobs.get, { jobId })).toMatchObject({
+        status: "failed",
+        error: { message: "The job stopped before it finished, so this call replaced it." },
+      });
+    }
   });
 
   test("lists jobs by status and refuses bad input", async () => {
@@ -200,7 +234,7 @@ describe("plan", () => {
   });
 
   test("stops at the last attempt or a permanent error", () => {
-    expect(plan({ attempts: MAX_ATTEMPTS - 1 }, transient)).toEqual({ status: "failed", delayMs: null, attempts: 0 });
+    expect(plan({ attempts: 4 }, transient)).toEqual({ status: "failed", delayMs: null, attempts: 0 });
     expect(plan({ attempts: 0 }, { ...transient, retryable: false })).toEqual({
       status: "failed",
       delayMs: null,
@@ -210,7 +244,7 @@ describe("plan", () => {
   });
 
   test("keeps a repeating job on its interval", () => {
-    expect(plan({ attempts: MAX_ATTEMPTS - 1, everyMs: 60_000 }, transient)).toEqual({
+    expect(plan({ attempts: 4, everyMs: 60_000 }, transient)).toEqual({
       status: "scheduled",
       delayMs: 60_000,
       attempts: 0,

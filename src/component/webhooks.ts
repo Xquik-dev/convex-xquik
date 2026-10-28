@@ -42,15 +42,12 @@ function handleArgs(onEvent: string | undefined): { onEvent?: string } {
   });
 }
 
-export async function store(ctx: MutationCtx, event: EventFields, onEvent?: string): Promise<"stored" | "duplicate"> {
+export async function store(ctx: MutationCtx, event: EventFields): Promise<void> {
   const existing = await ctx.db
     .query("events")
     .withIndex("by_stream_event", (q) => q.eq("streamEventId", event.streamEventId))
     .unique();
-  if (existing !== null) return "duplicate";
-  await ctx.db.insert("events", event);
-  if (onEvent !== undefined && isHandle(onEvent)) await ctx.scheduler.runAfter(0, onEvent, { event });
-  return "stored";
+  if (existing === null) await ctx.db.insert("events", event);
 }
 
 export const insert = internalMutation({
@@ -166,9 +163,21 @@ export const ingest = internalMutation({
     if (seen !== null) return "replay";
     const now = Date.now();
     await ctx.db.insert("nonces", { endpointId, nonce, expiresAt: now + NONCE_TTL_MS });
-    if (event !== null) return await store(ctx, event, (await ctx.db.get("endpoints", endpointId))?.onEvent);
-    await ctx.db.patch("endpoints", endpointId, { testedAt: now });
-    return "test";
+    if (event === null) {
+      await ctx.db.patch("endpoints", endpointId, { testedAt: now });
+      return "test";
+    }
+    const { streamEventId } = event;
+    const receipt = await ctx.db
+      .query("receipts")
+      .withIndex("by_event", (q) => q.eq("endpointId", endpointId).eq("streamEventId", streamEventId))
+      .unique();
+    if (receipt !== null) return "duplicate";
+    await ctx.db.insert("receipts", { endpointId, streamEventId });
+    await store(ctx, event);
+    const onEvent = (await ctx.db.get("endpoints", endpointId))?.onEvent;
+    if (onEvent !== undefined && isHandle(onEvent)) await ctx.scheduler.runAfter(0, onEvent, { event });
+    return "stored";
   },
 });
 
