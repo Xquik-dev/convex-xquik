@@ -12,21 +12,19 @@ export async function requireUser(ctx: { readonly auth: Auth }): Promise<string>
   return identity.subject;
 }
 
-function field(value: unknown, name: string): unknown {
-  return value instanceof Object ? Object.entries(value).find(([key]) => key === name)?.[1] : undefined;
-}
-
 export const profile = internalAction({
   args: { username: v.string() },
   returns: v.object({ name: v.string(), followers: v.number() }),
   handler: async (ctx, { username }) => {
-    const user: unknown = await ctx.runAction(components.xquik.operations.getUser, { id: username });
-    const name = field(user, "name");
-    const followers = field(user, "followers");
-    if (typeof name !== "string" || typeof followers !== "number") {
-      throw new ConvexError({ status: 502, error: "unexpected_profile", message: `No profile for ${username}.` });
+    const user = await ctx.runAction(components.xquik.operations.getUser, { id: username });
+    if (user.followers === undefined) {
+      throw new ConvexError({
+        status: 502,
+        error: "no_follower_count",
+        message: `X sent no follower count for ${username}.`,
+      });
     }
-    return { name, followers };
+    return { name: user.name, followers: user.followers };
   },
 });
 
@@ -34,12 +32,9 @@ export const draft = internalAction({
   args: { text: v.string() },
   returns: v.string(),
   handler: async (ctx, { text }) => {
-    const created: unknown = await ctx.runAction(components.xquik.operations.createDraft, { text });
-    const id = field(created, "id");
-    if (typeof id !== "string")
-      throw new ConvexError({ status: 502, error: "unexpected_draft", message: "No draft ID." });
-    await ctx.runAction(components.xquik.operations.deleteDraft, { id });
-    return id;
+    const created = await ctx.runAction(components.xquik.operations.createDraft, { text });
+    await ctx.runAction(components.xquik.operations.deleteDraft, { id: created.id });
+    return created.id;
   },
 });
 

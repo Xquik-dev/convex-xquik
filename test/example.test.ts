@@ -63,30 +63,33 @@ describe("the example app", () => {
       followers: 9,
     });
     expect(recorded[0]?.url.pathname).toBe("/api/v1/x/users/elonmusk");
-    for (const answer of [{ id: "1" }, { name: "Elon Musk" }, { followers: 9 }, "elonmusk", null]) {
+    stubFetch(() => Response.json({ id: "11348282", username: "NASA", name: "NASA" }));
+    expect(await rejection(t.action(internal.example.profile, { username: "NASA" }))).toEqual({
+      status: 502,
+      error: "no_follower_count",
+      message: "X sent no follower count for NASA.",
+    });
+    for (const answer of [{ id: "1" }, { id: "1", username: "NASA", name: 5 }, "NASA", null]) {
       stubFetch(() => Response.json(answer));
-      expect(await rejection(t.action(internal.example.profile, { username: "elonmusk" }))).toEqual({
-        status: 502,
-        error: "unexpected_profile",
-        message: "No profile for elonmusk.",
-      });
+      expect(String(await rejection(t.action(internal.example.profile, { username: "NASA" })))).toContain(
+        'Return value validation failed for action "operations:getUser"',
+      );
     }
   });
 
   test("writes and deletes a draft through the component", async () => {
     const t = exampleTest().withIdentity({ subject: "user1" });
-    const recorded = stubFetch(() => Response.json({ id: "77", text: "hi" }));
+    const draft = { id: "77", text: "hi", createdAt: "2026-10-28T19:00:00Z", updatedAt: "2026-10-28T19:00:00Z" };
+    const recorded = stubFetch(() => Response.json(draft));
     expect(await t.action(internal.example.draft, { text: "hi" })).toBe("77");
     expect(recorded.map(({ method, url }) => `${method} ${url.pathname}`)).toEqual([
       "POST /api/v1/drafts",
       "DELETE /api/v1/drafts/77",
     ]);
     stubFetch(() => Response.json([]));
-    expect(await rejection(t.action(internal.example.draft, { text: "hi" }))).toEqual({
-      status: 502,
-      error: "unexpected_draft",
-      message: "No draft ID.",
-    });
+    expect(String(await rejection(t.action(internal.example.draft, { text: "hi" })))).toContain(
+      'Return value validation failed for action "operations:createDraft"',
+    );
   });
 
   test("creates a webhook that calls the app handler for each new event", async () => {

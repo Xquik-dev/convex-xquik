@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Type each operation's result & check it with a validator from `openapi.json`. Export `OperationResult`.
+
 ## 0.1.0
 
 - Add the Xquik Convex component with 1 typed action for each of the 190 public operations.
