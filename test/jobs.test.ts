@@ -21,7 +21,7 @@ describe("jobs", () => {
   test("runs a scheduled read once and keeps its result", async () => {
     vi.useFakeTimers();
     const t = componentTest();
-    stubFetch(() => Response.json({ id: "44196397", username: "elonmusk" }));
+    stubFetch(() => Response.json({ id: "44196397", username: "elonmusk", name: "Elon Musk", extra: 1 }));
     const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "elonmusk" } });
     vi.runAllTimers();
     await settle(t);
@@ -29,7 +29,27 @@ describe("jobs", () => {
       status: "succeeded",
       runs: 1,
       attempts: 0,
-      result: { username: "elonmusk" },
+      result: { id: "44196397", username: "elonmusk", name: "Elon Musk" },
+    });
+  });
+
+  test("fails a job at once when its answer breaks the result schema", async () => {
+    vi.useFakeTimers();
+    const t = componentTest();
+    const recorded = stubFetch(() => Response.json({ id: "11348282", username: "NASA", name: 5 }));
+    const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "NASA" } });
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      vi.runOnlyPendingTimers();
+      await settle(t);
+    }
+    expect(recorded).toHaveLength(1);
+    expect(await t.query(api.jobs.get, { jobId })).toMatchObject({
+      status: "failed",
+      error: {
+        status: 502,
+        error: "unexpected_result",
+        message: "Xquik answered getUser with a result its schema does not allow.",
+      },
     });
   });
 
@@ -40,10 +60,12 @@ describe("jobs", () => {
       id: "7",
       type: "tweet.new",
       monitorId: "10",
+      monitorType: "account",
       occurredAt: "2026-10-28T19:00:00.000Z",
       data: { id: "1" },
     };
-    stubFetch(() => Response.json({ events: [event, event, { id: 8 }], hasMore: false }));
+    const undated = { ...event, id: "8", occurredAt: "soon" };
+    stubFetch(() => Response.json({ events: [event, event, undated], hasMore: false }));
     const jobId = await t.mutation(api.jobs.enqueue, { operation: "listEvents", args: {}, everyMs: 60_000 });
     for (let run = 0; run < 2; run += 1) {
       vi.runOnlyPendingTimers();
@@ -75,22 +97,28 @@ describe("jobs", () => {
     vi.useFakeTimers();
     const t = componentTest();
     const event = { id: "7", type: "tweet.new", occurredAt: "2026-10-28T19:00:00.000Z", data: null };
-    stubFetch(() => Response.json({ events: [event] }));
     const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "elonmusk" } });
-    vi.runAllTimers();
-    await settle(t);
+    await t.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: { events: [event] } } });
     expect(await t.query(api.jobs.get, { jobId })).toMatchObject({ status: "succeeded" });
     const page = await t.query(api.events.list, { paginationOpts: { numItems: 10, cursor: null } });
     expect(page.page).toEqual([]);
   });
 
   test("retries a write with the same Idempotency-Key", async () => {
+    const extraction = {
+      id: "1",
+      pollAfterMs: 1000,
+      statusUrl: "https://xquik.com/api/v1/extractions/1",
+      waitUrl: "https://xquik.com/api/v1/extractions/1/wait",
+      toolType: "reply_extractor",
+      status: "pending",
+    };
     vi.useFakeTimers();
     const t = componentTest();
     let calls = 0;
     const recorded = stubFetch(() => {
       calls += 1;
-      return calls === 1 ? Response.json({ error: "busy" }, { status: 503 }) : Response.json({ id: "1" });
+      return calls === 1 ? Response.json({ error: "busy" }, { status: 503 }) : Response.json(extraction);
     });
     const jobId = await t.mutation(api.jobs.enqueue, {
       operation: "createExtraction",

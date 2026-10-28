@@ -2,6 +2,7 @@ import {
   createFunctionHandle,
   type FunctionArgs,
   type FunctionReference,
+  type FunctionReturnType,
   type GenericActionCtx,
   type GenericDataModel,
   type GenericMutationCtx,
@@ -19,6 +20,8 @@ export type EventDoc = Infer<typeof eventDoc>;
 export type OperationName = keyof ComponentApi["operations"];
 
 export type OperationArgs<Name extends OperationName> = FunctionArgs<ComponentApi["operations"][Name]>;
+
+export type OperationResult<Name extends OperationName> = FunctionReturnType<ComponentApi["operations"][Name]>;
 
 type ActionCtx = Pick<GenericActionCtx<GenericDataModel>, "runAction">;
 type MutationCtx = Pick<GenericMutationCtx<GenericDataModel>, "runMutation">;

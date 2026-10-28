@@ -37,7 +37,7 @@ Checked on 2026-10-28. See each number with its date & source on [xquik.com/trus
 
 ## What you get
 
-- 190 typed Convex actions, 1 for each public operation in the [Xquik API reference](https://docs.xquik.com/api-reference/overview).
+- 190 typed Convex actions, 1 for each public operation in the [Xquik API reference](https://docs.xquik.com/api-reference/overview). Convex checks the arguments & the result of each call.
 - A webhook receiver that checks each delivery's signature & stores each event once.
 - Live queries over stored events, so your UI updates as events arrive.
 - Durable jobs that retry safe calls & repeat on a schedule.
@@ -84,6 +84,8 @@ export const latest = internalAction({
 ```
 
 Call `components.xquik.operations.getUser` with `{ id: "elonmusk" }` for a profile. A failed call throws a `ConvexError`. Its data has `status`, `error`, `message` & `retryAfter` in seconds for a 429.
+
+Each result has the type & the validator of its schema in the API reference, so the `name` of a `getUser` result is a `string`. The result holds only the fields that schema lists. A JSON-LD key such as `@id` arrives as `id`. Import `OperationResult<"getUser">` from `convex-xquik` to name a result type.
 
 ## Receive webhook events
 
@@ -137,7 +139,7 @@ Use it with `usePaginatedQuery(api.x.events, {}, { initialNumItems: 20 })`. Pass
 await xquik.schedule(ctx, "listEvents", { limit: 100 }, { key: "events", everyMs: 5 * 60 * 1000 });
 ```
 
-A job with a `key` runs once at a time, so calling this again returns the same job. A read, or a write that takes an `Idempotency-Key`, makes up to 5 attempts on a 429, a 5xx or a network error. The component fills the key for you. Scheduled `listEvents` jobs store their events with the webhook events. Read a job with `components.xquik.jobs.get` & stop it with `components.xquik.jobs.cancel`.
+A job with a `key` runs once at a time, so calling this again returns the same job. A read, or a write that takes an `Idempotency-Key`, makes up to 5 attempts on a 429, a 5xx or a network error. The component fills the key for you. A result that breaks its schema fails the job without a retry. Scheduled `listEvents` jobs store their events with the webhook events. Read a job with `components.xquik.jobs.get` & stop it with `components.xquik.jobs.cancel`.
 
 ## Keep credits safe
 

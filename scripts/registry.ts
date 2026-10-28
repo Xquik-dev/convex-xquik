@@ -7,7 +7,6 @@ import {
   type Operation,
   type Param,
   type Registry,
-  type Response,
   type Shape,
 } from "../src/component/shape.ts";
 
@@ -47,54 +46,107 @@ function literal(value: unknown): Shape {
   throw new Error(`openapi.json has the enum value ${JSON.stringify(value)}, which no validator can hold.`);
 }
 
+const SCHEMAS = "#/components/schemas/";
+
+const EVENTS: Shape = {
+  array: {
+    object: {
+      id: { shape: "string", optional: true },
+      event: { shape: "string", optional: true },
+      data: { shape: "any", optional: false },
+    },
+  },
+};
+
+type Node = Readonly<Record<string, unknown>>;
+
+function merge(left: Node, right: Node): Node {
+  const properties: Record<string, unknown> = { ...objectAt(left["properties"]) };
+  for (const [name, schema] of Object.entries(objectAt(right["properties"]))) {
+    const known = properties[name];
+    properties[name] = known === undefined ? schema : { allOf: [known, schema] };
+  }
+  const merged = { ...left, ...right, required: [...stringsAt(left["required"]), ...stringsAt(right["required"])] };
+  return right["properties"] === undefined ? merged : { ...merged, properties };
+}
+
 export function readRegistry(spec: unknown): Registry {
   const root = objectAt(spec);
+  const schemas = new Map<string, Shape>();
+  const building: string[] = [];
 
-  function resolve(value: unknown, seen: readonly string[] = []): Readonly<Record<string, unknown>> {
-    const node = objectAt(value);
-    const ref = node["$ref"];
-    if (typeof ref !== "string") return node;
-    if (seen.includes(ref)) throw new Error(`openapi.json has the reference cycle ${[...seen, ref].join(" > ")}.`);
+  function pointer(ref: string): Node {
     const target = ref
       .slice(2)
       .split("/")
       .map((token) => token.replaceAll("~1", "/").replaceAll("~0", "~"))
       .reduce<unknown>((parent, token) => objectAt(parent)[token], root);
     if (target === undefined) throw new Error(`openapi.json has the broken reference ${ref}.`);
-    return resolve(target, [...seen, ref]);
+    return objectAt(target);
   }
 
-  function fields(node: Readonly<Record<string, unknown>>, optional: boolean): Record<string, Field> {
+  function resolve(value: unknown, seen: readonly string[] = []): Node {
+    const node = objectAt(value);
+    const ref = node["$ref"];
+    if (typeof ref !== "string") return node;
+    if (seen.includes(ref)) throw new Error(`openapi.json has the reference cycle ${[...seen, ref].join(" > ")}.`);
+    return resolve(pointer(ref), [...seen, ref]);
+  }
+
+  function build(name: string): Shape {
+    const ref = SCHEMAS + name;
+    if (building.includes(ref)) {
+      throw new Error(`openapi.json has the reference cycle ${[...building, ref].join(" > ")}.`);
+    }
+    const known = schemas.get(name);
+    if (known !== undefined) return known;
+    building.push(ref);
+    const built = shape(pointer(ref));
+    building.pop();
+    schemas.set(name, built);
+    return built;
+  }
+
+  function deref(value: Shape): Shape {
+    return typeof value === "object" && "ref" in value ? deref(build(value.ref)) : value;
+  }
+
+  function flatten({ allOf, ...node }: Node): Node {
+    return listAt(allOf)
+      .map((part) => flatten(resolve(part)))
+      .reduce(merge, node);
+  }
+
+  function fields(node: Node): Record<string, Field> {
     const required = stringsAt(node["required"]);
     return Object.fromEntries(
-      Object.entries(objectAt(node["properties"])).map(([name, value]) => [
-        name,
-        { shape: shape(value), optional: optional || !required.includes(name) },
-      ]),
+      Object.entries(objectAt(node["properties"])).map(([wire, value]) => {
+        const field = { shape: shape(value), optional: !required.includes(wire) };
+        const name = wire.replace(/^@/, "");
+        return [name, name === wire ? field : { ...field, wire }];
+      }),
     );
   }
 
   function objects(id: string, members: readonly Shape[]): Readonly<Record<string, Field>>[] {
-    return members.map((member) => {
+    return members.map(deref).map((member) => {
       if (typeof member === "object" && "object" in member) return member.object;
       throw new Error(`${id} has ${JSON.stringify(member)} where it needs an object.`);
     });
   }
 
-  function combine(parts: Readonly<Record<string, Field>>[], everyPart: boolean): Record<string, Field> {
+  function combine(parts: Readonly<Record<string, Field>>[]): Record<string, Field> {
     const names = [...new Set(parts.flatMap((part) => Object.keys(part)))];
     return Object.fromEntries(
       names.map((name) => {
         const present = parts.flatMap((part) => part[name] ?? []);
-        const optional = everyPart
-          ? present.every((field) => field.optional)
-          : present.length < parts.length || present.some((field) => field.optional);
+        const optional = present.length < parts.length || present.some((field) => field.optional);
         return [name, { shape: union(present.map((field) => field.shape)), optional }];
       }),
     );
   }
 
-  function typed(node: Readonly<Record<string, unknown>>, type: string): Shape {
+  function typed(node: Node, type: string): Shape {
     if (type === "string") return "string";
     if (type === "number" || type === "integer") return "number";
     if (type === "boolean") return "boolean";
@@ -103,33 +155,51 @@ export function readRegistry(spec: unknown): Registry {
     return objectShape(node);
   }
 
-  function objectShape(node: Readonly<Record<string, unknown>>): Shape {
-    if (node["properties"] !== undefined) return { object: fields(node, false) };
+  function objectShape(node: Node): Shape {
+    if (node["properties"] !== undefined) return { object: fields(node) };
     const extra = node["additionalProperties"];
     return isRecord(extra) ? { record: shape(extra) } : "any";
   }
 
-  function shape(value: unknown): Shape {
-    const node = resolve(value);
+  function nodeShape(raw: Node): Shape {
+    const { oneOf, anyOf, ...node } = flatten(raw);
     if (node["const"] !== undefined) return literal(node["const"]);
     if (node["enum"] !== undefined) return union(listAt(node["enum"]).map(literal));
-    const variants = [...listAt(node["oneOf"]), ...listAt(node["anyOf"])];
-    if (variants.length > 0) return union(variants.map(shape));
-    const parts = listAt(node["allOf"]);
-    if (parts.length > 0) return { object: combine(objects("An allOf", parts.map(shape)), true) };
+    const variants = [...listAt(oneOf), ...listAt(anyOf)];
+    if (variants.length > 0) {
+      if (node["properties"] === undefined && node["required"] === undefined) return union(variants.map(shape));
+      return union(variants.map((variant) => nodeShape(merge(node, flatten(resolve(variant))))));
+    }
     if (node["type"] === undefined) return objectShape(node);
     const types = [node["type"]].flat().filter((type) => typeof type === "string");
     return union(types.map((type) => typed(node, type)));
   }
 
-  function response(op: Readonly<Record<string, unknown>>): Response {
+  function shape(value: unknown): Shape {
+    const node = objectAt(value);
+    const ref = node["$ref"];
+    if (typeof ref !== "string" || !ref.startsWith(SCHEMAS)) return nodeShape(resolve(node));
+    const name = ref.slice(SCHEMAS.length);
+    build(name);
+    return { ref: name };
+  }
+
+  function outcome(op: Node): Pick<Operation, "response" | "result"> {
     const responses = objectAt(op["responses"]);
-    const success = Object.keys(responses).filter((code) => code.startsWith("2"));
-    const types = success.flatMap((code) => Object.keys(objectAt(resolve(responses[code])["content"])));
-    if (types.includes("application/json")) return "json";
-    if (types.includes("application/octet-stream")) return "bytes";
-    if (types.includes("text/event-stream")) return "events";
-    return "none";
+    const contents = Object.keys(responses)
+      .filter((code) => code.startsWith("2"))
+      .map((code) => objectAt(resolve(responses[code])["content"]));
+    const types = contents.flatMap((content) => Object.keys(content));
+    if (types.includes("application/json")) {
+      const results = contents.map((content) => {
+        const media = content["application/json"];
+        return media === undefined ? "null" : shape(objectAt(media)["schema"]);
+      });
+      return { response: "json", result: union(results) };
+    }
+    if (types.includes("application/octet-stream")) return { response: "bytes", result: "bytes" };
+    if (types.includes("text/event-stream")) return { response: "events", result: EVENTS };
+    return { response: "none", result: "null" };
   }
 
   function isPublic(security: unknown): boolean {
@@ -139,11 +209,7 @@ export function readRegistry(spec: unknown): Registry {
     });
   }
 
-  function entry(
-    path: string,
-    method: (typeof METHODS)[number],
-    item: Readonly<Record<string, unknown>>,
-  ): [string, Operation][] {
+  function entry(path: string, method: (typeof METHODS)[number], item: Node): [string, Operation][] {
     const op = objectAt(item[method]);
     const id = op["operationId"];
     if (typeof id !== "string" || !isPublic(op["security"] ?? root["security"])) return [];
@@ -160,33 +226,31 @@ export function readRegistry(spec: unknown): Registry {
     }
     const requestBody = resolve(op["requestBody"]);
     const schema = objectAt(objectAt(requestBody["content"])["application/json"])["schema"];
-    const body = schema === undefined ? null : shape(schema);
+    const body = schema === undefined ? null : deref(shape(schema));
     const variants =
       body !== null && typeof body === "object" && "union" in body ? body.union : [body ?? { object: {} }];
-    const bodyFields = combine(objects(id, variants), false);
+    const bodyFields = combine(objects(id, variants));
     for (const [name, field] of Object.entries(bodyFields)) {
       if (args[name] !== undefined) throw new Error(`${id} has a parameter and a body field both named ${name}.`);
       args[name] = { shape: field.shape, optional: field.optional || requestBody["required"] !== true };
     }
-    return [
-      [
-        id,
-        {
-          method: method.toUpperCase(),
-          path,
-          params,
-          body: body === null ? null : Object.keys(bodyFields),
-          response: response(op),
-          args,
-        },
-      ],
-    ];
+    const operation = {
+      method: method.toUpperCase(),
+      path,
+      params,
+      body: body === null ? null : Object.keys(bodyFields),
+    };
+    return [[id, { ...operation, ...outcome(op), args }]];
   }
 
   const entries = Object.entries(objectAt(root["paths"])).flatMap(([path, item]) =>
     METHODS.flatMap((method) => entry(path, method, objectAt(item))),
   );
-  return Object.fromEntries(entries.sort(([left], [right]) => left.localeCompare(right)));
+  const byName = ([left]: [string, unknown], [right]: [string, unknown]): number => left.localeCompare(right);
+  return {
+    operations: Object.fromEntries(entries.sort(byName)),
+    schemas: Object.fromEntries([...schemas].sort(byName)),
+  };
 }
 
 export function eventTypes(spec: unknown): string[] {
@@ -195,7 +259,7 @@ export function eventTypes(spec: unknown): string[] {
 }
 
 export function renderOperations(registry: Registry): string {
-  const lines = Object.keys(registry).map((id) => `export const ${id} = operation(${JSON.stringify(id)});`);
+  const lines = Object.keys(registry.operations).map((id) => `export const ${id} = operation(${JSON.stringify(id)});`);
   return ['import { operation } from "./operation.js";', "", ...lines, ""].join("\n");
 }
 

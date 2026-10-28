@@ -1,7 +1,7 @@
-import { ConvexError, v } from "convex/values";
+import { ConvexError, v, type Value } from "convex/values";
 import { afterEach, describe, expect, test, vi } from "vitest";
-import { argument, events, find, parse, send, validator } from "../src/component/request.js";
-import type { Operation } from "../src/component/shape.js";
+import { argument, events, find, matches, parse, project, schema, send, validator } from "../src/component/request.js";
+import type { Field, Operation, Shape } from "../src/component/shape.js";
 import { toValue } from "../src/component/values.js";
 import { rejection, stubFetch } from "./helpers.js";
 
@@ -19,6 +19,7 @@ const search: Operation = {
   body: null,
   response: "json",
   args: {},
+  result: "any",
 };
 
 const create: Operation = { ...search, method: "POST", params: [], body: ["text", "goal"], path: "/api/v1/things" };
@@ -87,6 +88,14 @@ describe("send", () => {
     expect(await rejection(send(search, { id: "1" }, { ...options, apiKey: undefined }))).toEqual(missing);
     expect(await rejection(send(search, { id: "1" }, { ...options, apiKey: "" }))).toEqual(missing);
     expect(recorded).toHaveLength(0);
+  });
+
+  test("keeps only the documented fields of a JSON answer", async () => {
+    stubFetch(() => Response.json({ id: "1", name: "Mars", extra: true }));
+    expect(await send({ ...search, result: { ref: "JobLocation" } }, { id: "1" }, options)).toEqual({
+      id: "1",
+      name: "Mars",
+    });
   });
 
   test("returns bytes for a binary export", async () => {
@@ -170,6 +179,17 @@ describe("parsing", () => {
       v.object({ a: v.optional(v.number()) }),
     );
     expect(validator("any")).toEqual(v.any());
+    expect(validator("bytes")).toEqual(v.bytes());
+    expect(validator({ ref: "JobLocation" })).toEqual(v.object({ id: v.string(), name: v.string() }));
+  });
+
+  test("validator builds 1 validator for each named schema", () => {
+    expect(validator({ ref: "JobLocation" })).toBe(validator({ ref: "JobLocation" }));
+  });
+
+  test("schema names a schema the registry lacks", () => {
+    expect(schema("NextCursor")).toBe("string");
+    expect(() => schema("Nope")).toThrow("The operation registry has no schema Nope. Run npm run generate.");
   });
 
   test("argument returns one argument's validator and names a missing one", () => {
@@ -180,5 +200,71 @@ describe("parsing", () => {
   test("find names an unknown operation", () => {
     expect(() => find("nope")).toThrow(ConvexError);
     expect(find("getUser").path).toBe("/api/v1/x/users/{id}");
+  });
+});
+
+const post: Shape = {
+  object: {
+    id: { shape: "string", optional: false },
+    kind: { shape: { literal: "post" }, optional: true, wire: "@type" },
+  },
+};
+
+describe("results", () => {
+  test("project keeps documented fields under their Convex names and drops the rest", () => {
+    expect(project(post, { id: "1", "@type": "post", kind: "x", extra: true })).toEqual({ id: "1", kind: "post" });
+    expect(project({ array: post }, [{ id: "1", extra: 1 }])).toEqual([{ id: "1" }]);
+    expect(project({ record: post }, { a: { id: "1", extra: 1 } })).toEqual({ a: { id: "1" } });
+    expect(project({ ref: "JobLocation" }, { id: "1", name: "Mars", extra: 1 })).toEqual({ id: "1", name: "Mars" });
+    expect(project("any", { a: [1, undefined] })).toEqual({ a: [1, null] });
+    expect(project({ literal: 1 }, 1)).toBe(1);
+  });
+
+  test("project keeps the matching union member that holds the most data", () => {
+    const text: Field = { shape: "string", optional: false };
+    const posts: Shape = { union: [{ object: { id: text } }, { object: { id: text, text } }] };
+    expect(project(posts, { id: "1", text: "hi", extra: 1 })).toEqual({ id: "1", text: "hi" });
+    expect(project(posts, { id: "1", extra: 1 })).toEqual({ id: "1" });
+    const either: Shape = {
+      union: [
+        { object: { a: text } },
+        { object: { b: text } },
+        { object: { n: { shape: "number", optional: false } } },
+      ],
+    };
+    expect(project(either, { a: "x", b: "y" })).toEqual({ a: "x" });
+    expect(project(either, { b: "y", c: 1 })).toEqual({ b: "y" });
+    expect(project(either, { c: 1 })).toEqual({ c: 1 });
+  });
+
+  test("project leaves a value of the wrong kind for the returns validator to reject", () => {
+    expect(project({ array: "string" }, { a: 1 })).toEqual({ a: 1 });
+    expect(project({ record: "string" }, [1])).toEqual([1]);
+    expect(project(post, [1])).toEqual([1]);
+    expect(project("string", undefined)).toBeNull();
+  });
+
+  test("matches checks a value against a shape", () => {
+    const cases: [Shape, Value, Value][] = [
+      ["null", null, 0],
+      ["bytes", new ArrayBuffer(1), [1]],
+      ["string", "a", 1],
+      ["number", 1, "1"],
+      ["boolean", false, 0],
+      [{ literal: "a" }, "a", "b"],
+      [{ array: "number" }, [1, 2], [1, "2"]],
+      [{ array: "number" }, [], { 0: 1 }],
+      [{ record: "number" }, { a: 1 }, { a: "1" }],
+      [{ record: "number" }, {}, [1]],
+      [post, { id: "1" }, { kind: "post" }],
+      [post, { id: "1", kind: "post" }, { id: 1 }],
+      [post, { id: "1" }, "1"],
+      [{ union: ["string", "null"] }, null, 1],
+      [{ ref: "NextCursor" }, "abc", 1],
+    ];
+    for (const [shape, good, bad] of cases) {
+      expect([matches(shape, good), matches(shape, bad)]).toEqual([true, false]);
+    }
+    expect(matches("any", undefined)).toBe(true);
   });
 });

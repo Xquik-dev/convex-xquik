@@ -1,6 +1,6 @@
 import { ConvexError, v, type OptionalProperty, type Validator, type Value } from "convex/values";
 import data from "./registry.json" with { type: "json" };
-import { isRecord, parseRegistry, type Field, type Operation, type Shape } from "./shape.js";
+import { isList, isRecord, parseRegistry, type Field, type Operation, type Shape } from "./shape.js";
 import { json, toValue } from "./values.js";
 
 export const registry = parseRegistry(data);
@@ -12,16 +12,81 @@ const PRIMITIVES: Record<Extract<Shape, string>, Validator<Value, "required", st
   number: v.number(),
   boolean: v.boolean(),
   null: v.null(),
+  bytes: v.bytes(),
   any: json,
 };
 
+const named = new Map<string, Validator<Value, "required", string>>();
+
+export function schema(name: string): Shape {
+  const shape = registry.schemas[name];
+  if (shape === undefined) throw new Error(`The operation registry has no schema ${name}. Run npm run generate.`);
+  return shape;
+}
+
+function remember(name: string): Validator<Value, "required", string> {
+  const built = validator(schema(name));
+  named.set(name, built);
+  return built;
+}
+
 export function validator(shape: Shape): Validator<Value, "required", string> {
   if (typeof shape === "string") return PRIMITIVES[shape];
+  if ("ref" in shape) return named.get(shape.ref) ?? remember(shape.ref);
   if ("literal" in shape) return v.literal(shape.literal);
   if ("array" in shape) return v.array(validator(shape.array));
   if ("record" in shape) return v.record(v.string(), validator(shape.record));
   if ("object" in shape) return v.object(fields(shape.object));
   return v.union(...shape.union.map(validator));
+}
+
+export function matches(shape: Shape, value: Value | undefined): boolean {
+  if (shape === "any") return true;
+  if (shape === "null") return value === null;
+  if (shape === "bytes") return value instanceof ArrayBuffer;
+  if (typeof shape === "string") return typeof value === shape;
+  if ("ref" in shape) return matches(schema(shape.ref), value);
+  if ("literal" in shape) return value === shape.literal;
+  if ("array" in shape) return isList(value) && value.every((item) => matches(shape.array, item));
+  if ("record" in shape) return isRecord(value) && Object.values(value).every((item) => matches(shape.record, item));
+  if ("object" in shape) {
+    return (
+      isRecord(value) &&
+      Object.entries(shape.object).every(([name, field]) => {
+        const item = value[name];
+        return item === undefined ? field.optional : matches(field.shape, item);
+      })
+    );
+  }
+  return shape.union.some((member) => matches(member, value));
+}
+
+export function project(shape: Shape, value: unknown): Value {
+  if (typeof shape === "string" || "literal" in shape) return toValue(value);
+  if ("ref" in shape) return project(schema(shape.ref), value);
+  if ("array" in shape) return isList(value) ? value.map((item) => project(shape.array, item)) : toValue(value);
+  if ("record" in shape) {
+    return isRecord(value)
+      ? Object.fromEntries(Object.entries(value).map(([key, item]) => [key, project(shape.record, item)]))
+      : toValue(value);
+  }
+  if ("object" in shape) {
+    if (!isRecord(value)) return toValue(value);
+    return Object.fromEntries(
+      Object.entries(shape.object).flatMap(([name, field]) => {
+        const item = value[field.wire ?? name];
+        return item === undefined ? [] : [[name, project(field.shape, item)]];
+      }),
+    );
+  }
+  const fits = shape.union.flatMap((member) => {
+    const item = project(member, value);
+    return matches(member, item) ? [item] : [];
+  });
+  return fits.reduce<Value>(
+    (best, item) => (JSON.stringify(item).length > JSON.stringify(best).length ? item : best),
+    fits[0] ?? toValue(value),
+  );
 }
 
 export type Fields = Record<string, Validator<Value | undefined, OptionalProperty, string>>;
@@ -35,7 +100,7 @@ export function fields(shape: Readonly<Record<string, Field>>): Fields {
 }
 
 export function find(id: string): Operation {
-  const operation = registry[id];
+  const operation = registry.operations[id];
   if (operation === undefined) {
     throw new ConvexError({ status: 404, error: "unknown_operation", message: `${id} is not an Xquik operation.` });
   }
@@ -151,5 +216,7 @@ export async function send(operation: Operation, args: Args, options: Options): 
   if (operation.response === "bytes") return await response.arrayBuffer();
   if (operation.response === "events") return await readEvents(response, options.streamMs);
   const raw = await response.text();
-  return operation.response === "json" && raw !== "" ? parse(raw) : null;
+  if (operation.response !== "json" || raw === "") return null;
+  const value: unknown = JSON.parse(raw);
+  return project(operation.result, value);
 }

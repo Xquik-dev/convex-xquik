@@ -20,6 +20,6 @@ export default {
   reporters: ["clear-text", "json", "progress"],
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
   thresholds: { high: 100, low: 100, break: 100 },
-  concurrency: 4,
+  concurrency: 8,
   timeoutMS: 10_000,
 };
