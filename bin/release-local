@@ -1,0 +1,124 @@
+#!/usr/bin/env bash
+# SPDX-FileCopyrightText: 2026 Xquik Contributors
+# SPDX-License-Identifier: Apache-2.0
+set -euo pipefail
+
+script_directory="$(dirname "$0")"
+cd "${script_directory}/.."
+
+readonly expected_name="convex-xquik"
+readonly repository="Xquik-dev/convex-xquik"
+readonly registry="https://registry.npmjs.org/"
+
+dry_run=false
+for argument in "$@"; do
+  case "${argument}" in
+    --dry-run) dry_run=true ;;
+    *)
+      echo "release-local: unknown option ${argument}. Use --dry-run or no option." >&2
+      exit 2
+      ;;
+  esac
+done
+
+step() {
+  printf '==> %s\n' "$1"
+}
+
+fail() {
+  printf 'release-local: %s\n' "$1" >&2
+  exit 1
+}
+
+step "Checking the release tools"
+tools=(git jq node npm npx)
+${dry_run} || tools+=(gh security)
+for tool in "${tools[@]}"; do
+  command -v "${tool}" >/dev/null || fail "${tool} is missing. Install it, then rerun."
+done
+if ! ${dry_run}; then
+  [[ -n "${NPM_KEYCHAIN_SERVICE:-}" && -n "${NPM_KEYCHAIN_ACCOUNT:-}" ]] ||
+    fail "Set NPM_KEYCHAIN_SERVICE and NPM_KEYCHAIN_ACCOUNT to the Keychain item that holds the npm token, then rerun."
+  gh auth status >/dev/null 2>&1 || fail "gh is signed out. Run gh auth login, then rerun."
+fi
+
+step "Checking that main is clean and matches origin"
+changes="$(git status --porcelain)"
+[[ -z "${changes}" ]] || fail "The working tree has changes. Commit or remove them first."
+branch="$(git symbolic-ref --quiet --short HEAD || true)"
+[[ "${branch}" == main ]] || fail "Release only from main. Run git switch main first."
+git fetch --quiet --tags origin main
+head_commit="$(git rev-parse HEAD)"
+origin_commit="$(git rev-parse origin/main)"
+[[ "${head_commit}" == "${origin_commit}" ]] || fail "main differs from origin/main. Pull or push until they match."
+
+step "Reading the package version"
+name="$(jq -r -e '.name' package.json)"
+version="$(jq -r -e '.version' package.json)"
+tag="v${version}"
+[[ "${name}" == "${expected_name}" ]] || fail "package.json names ${name}. Set it to ${expected_name}."
+[[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "package.json version ${version} is not MAJOR.MINOR.PATCH."
+tagged="$(git rev-parse --quiet --verify "refs/tags/${tag}^{commit}" || true)"
+[[ -z "${tagged}" || "${tagged}" == "${head_commit}" ]] ||
+  fail "${tag} marks ${tagged:0:12}, not main. Raise the version in package.json and CHANGELOG.md first."
+
+workspace="$(mktemp -d "${TMPDIR:-/tmp}/convex-xquik-release.XXXXXX")"
+trap 'rm -rf -- "${workspace:?}"' EXIT
+
+step "Reading the ${version} notes from CHANGELOG.md"
+notes="${workspace}/notes.md"
+awk -v heading="## ${version}" '/^## / { if (found) exit; found = ($0 == heading); next } found { print }' \
+  CHANGELOG.md >"${notes}"
+grep -q '[^[:space:]]' "${notes}" || fail "CHANGELOG.md has no notes under ## ${version}. Add them first."
+
+step "Running bin/check-local"
+bin/check-local
+
+step "Packing ${expected_name}@${version}"
+npm ci --ignore-scripts --no-fund --no-audit
+[[ -f .env.local ]] || CONVEX_AGENT_MODE=anonymous npx convex init >/dev/null
+packed="$(npm pack --json --pack-destination "${workspace}")"
+file="$(jq -r -e '.[0].filename' <<<"${packed}")"
+archive="${workspace}/${file}"
+jq -e --arg name "${expected_name}" --arg version "${version}" '.[0] | .name == $name and .version == $version' \
+  <<<"${packed}" >/dev/null || fail "npm pack wrote a package other than ${expected_name}@${version}."
+changes="$(git status --porcelain)"
+[[ -z "${changes}" ]] || fail "The build changed tracked files. Commit the change, then rerun."
+
+if ${dry_run}; then
+  step "Listing what ${expected_name}@${version} would publish"
+  tar -tzf "${archive}" | sort
+  npm publish "${archive}" --dry-run --access public --tag latest --registry "${registry}"
+  echo "Dry run finished. Nothing was published, tagged or released."
+  exit 0
+fi
+
+step "Publishing ${expected_name}@${version} to npm"
+published="$(npm view "${expected_name}@${version}" version --registry "${registry}" 2>/dev/null || true)"
+if [[ "${published}" == "${version}" ]]; then
+  echo "${expected_name}@${version} is already on npm, so the upload is skipped."
+else
+  npmrc="${workspace}/npmrc"
+  (umask 077 && : >"${npmrc}")
+  token="$(security find-generic-password -s "${NPM_KEYCHAIN_SERVICE}" -a "${NPM_KEYCHAIN_ACCOUNT}" -w)" ||
+    fail "The Keychain has no item for NPM_KEYCHAIN_SERVICE and NPM_KEYCHAIN_ACCOUNT. Add the npm token there first."
+  printf '//registry.npmjs.org/:_authToken=%s\n' "${token}" >"${npmrc}"
+  unset token
+  echo "If npm asks for 2FA, open the URL it prints and approve. The script waits."
+  npm publish "${archive}" --access public --tag latest --registry "${registry}" --userconfig "${npmrc}"
+fi
+
+step "Tagging ${tag}"
+if [[ -z "${tagged}" ]]; then
+  git tag -a "${tag}" -m "${tag}" "${head_commit}"
+fi
+git push --quiet origin "refs/tags/${tag}"
+
+step "Creating the GitHub release ${tag}"
+if gh release view "${tag}" --repo "${repository}" >/dev/null 2>&1; then
+  echo "The ${tag} release exists, so it stays as it is."
+else
+  gh release create "${tag}" "${archive}" --repo "${repository}" --title "${tag}" --notes-file "${notes}" --verify-tag
+fi
+
+echo "Released ${expected_name}@${version} as ${tag}."

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Type each operation's result & check it with a validator from `openapi.json`. Export `OperationResult`.
 - Fail a job without a retry when its result breaks the result schema.

@@ -10,7 +10,7 @@ bin/check-local
 
 1. `npm ci` installs the locked dependencies.
 2. `git grep` bans each pattern in `lint/banned-patterns.txt` in every file. The list covers every suppression comment, exclusion key, rule set to off and skipped test.
-3. shellcheck lints `bin/check-local` with every optional check turned on.
+3. shellcheck lints `bin/check-local` and `bin/release-local` with every optional check turned on.
 4. REUSE 6.2.0 checks that every file has a license and a copyright.
 5. gitleaks scans every commit for secrets.
 6. lychee checks every relative link and anchor in the Markdown files offline.
@@ -34,3 +34,20 @@ The checks need Node, npm, jq, curl, uv and CodeQL on your PATH. They download t
 ## Update the operations
 
 Replace `openapi.json` with the latest `https://xquik.com/openapi.json`. Then run `npm run generate` and commit the registry and operations module it writes.
+
+## Release a version
+
+1. Raise `version` in `package.json` and `package-lock.json`, and put its changes under a `## <version>` heading in `CHANGELOG.md`.
+2. Merge that change to `main`, then run the dry run from a clean `main`. It runs `bin/check-local`, packs the package, lists its files and runs `npm publish --dry-run`.
+
+   ```bash
+   bin/release-local --dry-run
+   ```
+
+3. Name the Keychain item that holds an npm token with write access to `convex-xquik`, then release.
+
+   ```bash
+   NPM_KEYCHAIN_SERVICE=<service> NPM_KEYCHAIN_ACCOUNT=<account> bin/release-local
+   ```
+
+`bin/release-local` publishes the tarball it packed, tags the commit and creates the GitHub release with the tarball and the notes. A rerun skips each step that already happened. npm signs every version it serves, and `npm audit signatures` checks those signatures. Releases carry no npm provenance, because npm only makes provenance in a hosted CI run.
