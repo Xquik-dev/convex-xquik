@@ -46,6 +46,7 @@ describe("the webhook receiver", () => {
     expect(listed[0]?.endpointId).toBe(endpointId);
     expect(listed[0]?.url.startsWith(`${SITE}/webhooks/`)).toBe(true);
     expect(JSON.stringify(listed)).not.toContain(SECRET);
+    expect([listed[0]?.webhookId, listed[0]?.testedAt]).toEqual([null, null]);
   });
 
   test("records the test alert on the endpoint", async () => {

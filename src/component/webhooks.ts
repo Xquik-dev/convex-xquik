@@ -16,8 +16,8 @@ export const PURGE_BATCH = 256;
 const endpointView = v.object({
   endpointId: v.id("endpoints"),
   url: v.string(),
-  webhookId: v.optional(v.string()),
-  testedAt: v.optional(v.number()),
+  webhookId: v.union(v.null(), v.string()),
+  testedAt: v.union(v.null(), v.number()),
 });
 
 const endpointDoc = schema.tables.endpoints.validator.extend({ _id: v.id("endpoints"), _creationTime: v.number() });
@@ -107,8 +107,8 @@ export const list = query({
     return endpoints.map(({ _id, token, webhookId, testedAt }) => ({
       endpointId: _id,
       url: urlOf(token),
-      ...(webhookId === undefined ? {} : { webhookId }),
-      ...(testedAt === undefined ? {} : { testedAt }),
+      webhookId: webhookId ?? null,
+      testedAt: testedAt ?? null,
     }));
   },
 });
