@@ -79,11 +79,14 @@ export function project(shape: Shape, value: unknown): Value {
       }),
     );
   }
-  for (const member of shape.union) {
+  const fits = shape.union.flatMap((member) => {
     const item = project(member, value);
-    if (matches(member, item)) return item;
-  }
-  return toValue(value);
+    return matches(member, item) ? [item] : [];
+  });
+  return fits.reduce<Value>(
+    (best, item) => (JSON.stringify(item).length > JSON.stringify(best).length ? item : best),
+    fits[0] ?? toValue(value),
+  );
 }
 
 export type Fields = Record<string, Validator<Value | undefined, OptionalProperty, string>>;

@@ -85,7 +85,7 @@ export const latest = internalAction({
 
 Call `components.xquik.operations.getUser` with `{ id: "elonmusk" }` for a profile. A failed call throws a `ConvexError`. Its data has `status`, `error`, `message` & `retryAfter` in seconds for a 429.
 
-Each result has the type & the validator of its schema in the API reference, so `profile.name` is a `string`. The result holds only the fields that schema lists. A JSON-LD key such as `@id` arrives as `id`. Import `OperationResult<"getUser">` from `convex-xquik` to name a result type.
+Each result has the type & the validator of its schema in the API reference, so the `name` of a `getUser` result is a `string`. The result holds only the fields that schema lists. A JSON-LD key such as `@id` arrives as `id`. Import `OperationResult<"getUser">` from `convex-xquik` to name a result type.
 
 ## Receive webhook events
 
@@ -139,7 +139,7 @@ Use it with `usePaginatedQuery(api.x.events, {}, { initialNumItems: 20 })`. Pass
 await xquik.schedule(ctx, "listEvents", { limit: 100 }, { key: "events", everyMs: 5 * 60 * 1000 });
 ```
 
-A job with a `key` runs once at a time, so calling this again returns the same job. A read, or a write that takes an `Idempotency-Key`, makes up to 5 attempts on a 429, a 5xx or a network error. The component fills the key for you. Scheduled `listEvents` jobs store their events with the webhook events. Read a job with `components.xquik.jobs.get` & stop it with `components.xquik.jobs.cancel`.
+A job with a `key` runs once at a time, so calling this again returns the same job. A read, or a write that takes an `Idempotency-Key`, makes up to 5 attempts on a 429, a 5xx or a network error. The component fills the key for you. A result that breaks its schema fails the job without a retry. Scheduled `listEvents` jobs store their events with the webhook events. Read a job with `components.xquik.jobs.get` & stop it with `components.xquik.jobs.cancel`.
 
 ## Keep credits safe
 

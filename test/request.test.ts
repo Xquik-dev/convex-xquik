@@ -1,7 +1,7 @@
 import { ConvexError, v, type Value } from "convex/values";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { argument, events, find, matches, parse, project, schema, send, validator } from "../src/component/request.js";
-import type { Operation, Shape } from "../src/component/shape.js";
+import type { Field, Operation, Shape } from "../src/component/shape.js";
 import { toValue } from "../src/component/values.js";
 import { rejection, stubFetch } from "./helpers.js";
 
@@ -220,15 +220,20 @@ describe("results", () => {
     expect(project({ literal: 1 }, 1)).toBe(1);
   });
 
-  test("project picks the first union member the value matches", () => {
+  test("project keeps the matching union member that holds the most data", () => {
+    const text: Field = { shape: "string", optional: false };
+    const posts: Shape = { union: [{ object: { id: text } }, { object: { id: text, text } }] };
+    expect(project(posts, { id: "1", text: "hi", extra: 1 })).toEqual({ id: "1", text: "hi" });
+    expect(project(posts, { id: "1", extra: 1 })).toEqual({ id: "1" });
     const either: Shape = {
       union: [
-        { object: { a: { shape: "number", optional: false } } },
-        { object: { b: { shape: "string", optional: false } } },
+        { object: { a: text } },
+        { object: { b: text } },
+        { object: { n: { shape: "number", optional: false } } },
       ],
     };
-    expect(project(either, { b: "x", c: 1 })).toEqual({ b: "x" });
-    expect(project(either, { a: 1, b: "x" })).toEqual({ a: 1 });
+    expect(project(either, { a: "x", b: "y" })).toEqual({ a: "x" });
+    expect(project(either, { b: "y", c: 1 })).toEqual({ b: "y" });
     expect(project(either, { c: 1 })).toEqual({ c: 1 });
   });
 

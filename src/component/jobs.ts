@@ -5,7 +5,7 @@ import type { Id } from "./_generated/dataModel.js";
 import { env, internalAction, internalMutation, internalQuery, mutation, query } from "./_generated/server.js";
 import { pulledEvents } from "./delivery.js";
 import { STREAM_MS } from "./operation.js";
-import { find, send } from "./request.js";
+import { find, matches, send } from "./request.js";
 import schema, { jobStatus } from "./schema.js";
 import { isRecord, type Operation } from "./shape.js";
 import { json } from "./values.js";
@@ -47,6 +47,12 @@ function keyed(definition: Operation): boolean {
 
 function isConvexError(error: unknown): error is ConvexError<Value> {
   return error instanceof ConvexError;
+}
+
+export function checked(id: string, definition: Operation, value: Value): Outcome {
+  if (matches(definition.result, value)) return { ok: true, result: value };
+  const message = `Xquik answered ${id} with a result its schema does not allow.`;
+  return { ok: false, error: { status: 502, error: "unexpected_result", message }, retryable: false };
 }
 
 export function failed(definition: Operation, error: unknown): Extract<Outcome, { ok: false }> {
@@ -121,7 +127,7 @@ export const run = internalAction({
     const definition = find(job.operation);
     const args = keyed(definition) ? { idempotencyKey: `${jobId}-${String(job.runs)}`, ...job.args } : job.args;
     const result: Outcome = await send(definition, args, { apiKey: env.XQUIK_API_KEY, streamMs: STREAM_MS }).then(
-      (value) => ({ ok: true, result: value }),
+      (value) => checked(job.operation, definition, value),
       (error: unknown) => failed(definition, error),
     );
     await ctx.runMutation(internal.jobs.finish, { jobId, outcome: result });

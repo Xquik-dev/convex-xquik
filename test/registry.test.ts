@@ -496,7 +496,12 @@ describe("the registry parser", () => {
         "The operation registry is malformed. Run npm run generate.",
       );
     }
-    for (const bad of [null, { operations: {} }, { schemas: {} }, { operations: {}, schemas: { A: "date" } }]) {
+    for (const bad of [
+      null,
+      { operations: {} },
+      { schemas: {} },
+      { operations: {}, schemas: { A: "string", B: "date" } },
+    ]) {
       expect(() => parseRegistry(bad)).toThrow("The operation registry is malformed. Run npm run generate.");
     }
   });

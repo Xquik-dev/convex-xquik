@@ -151,7 +151,14 @@ describe("the example app", () => {
   test("shows pulled events in the live query", async () => {
     vi.useFakeTimers();
     const t = exampleTest().withIdentity({ subject: "user1" });
-    const event = { id: "9001", type: "tweet.new", occurredAt: "2026-10-28T19:00:00.000Z", data: { id: "1" } };
+    const event = {
+      id: "9001",
+      type: "tweet.new",
+      monitorId: "10",
+      monitorType: "account",
+      occurredAt: "2026-10-28T19:00:00.000Z",
+      data: { id: "1" },
+    };
     stubFetch(() => Response.json({ events: [event], hasMore: false }));
     const jobId = await t.mutation(internal.example.pull, {});
     expect(await t.query(components.xquik.jobs.get, { jobId })).toMatchObject({

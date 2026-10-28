@@ -67,7 +67,7 @@ function merge(left: Node, right: Node): Node {
     properties[name] = known === undefined ? schema : { allOf: [known, schema] };
   }
   const merged = { ...left, ...right, required: [...stringsAt(left["required"]), ...stringsAt(right["required"])] };
-  return left["properties"] === undefined && right["properties"] === undefined ? merged : { ...merged, properties };
+  return right["properties"] === undefined ? merged : { ...merged, properties };
 }
 
 export function readRegistry(spec: unknown): Registry {
@@ -117,11 +117,11 @@ export function readRegistry(spec: unknown): Registry {
       .reduce(merge, node);
   }
 
-  function fields(node: Node, optional: boolean): Record<string, Field> {
+  function fields(node: Node): Record<string, Field> {
     const required = stringsAt(node["required"]);
     return Object.fromEntries(
       Object.entries(objectAt(node["properties"])).map(([wire, value]) => {
-        const field = { shape: shape(value), optional: optional || !required.includes(wire) };
+        const field = { shape: shape(value), optional: !required.includes(wire) };
         const name = wire.replace(/^@/, "");
         return [name, name === wire ? field : { ...field, wire }];
       }),
@@ -156,7 +156,7 @@ export function readRegistry(spec: unknown): Registry {
   }
 
   function objectShape(node: Node): Shape {
-    if (node["properties"] !== undefined) return { object: fields(node, false) };
+    if (node["properties"] !== undefined) return { object: fields(node) };
     const extra = node["additionalProperties"];
     return isRecord(extra) ? { record: shape(extra) } : "any";
   }
