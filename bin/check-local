@@ -124,25 +124,62 @@ install_tool() {
 }
 
 no_banned_patterns() {
+  local ignore_files
   git grep -nIP --untracked -f lint/banned-patterns.txt
-  (($? == 1))
+  (($? == 1)) || return 1
+  ignore_files="$(git ls-files --cached --others --exclude-standard -- ':(glob)**/.*ignore' ':(exclude,glob)**/.gitignore')" ||
+    return
+  [[ -z "${ignore_files}" ]] || {
+    printf 'These files make a tool skip files or findings whatever its flags say.\n%s\n' "${ignore_files}" >&2
+    return 1
+  }
 }
 
 lint_shell() {
-  "${tools}/shellcheck" --norc --check-sourced --enable=all --extended-analysis=true --severity=style bin/check-local bin/release-local
+  local listing files=()
+  listing="$({
+    git ls-files --cached --others --exclude-standard -- '*.sh' '*.bash' &&
+      { git grep -lIE --untracked '^#!.*sh( |$)' -- ':(exclude,glob)**/?*.*' || (($? == 1)); }
+  } | sort -u)" || return
+  mapfile -t files <<<"${listing}"
+  "${tools}/shellcheck" --norc --check-sourced --enable=all --extended-analysis=true --severity=style "${files[@]}"
+}
+
+scan_secrets() {
+  printf '[extend]\nuseDefault = true\n' >"${workspace}/gitleaks.toml" && mkdir "${workspace}/gitleaks-ignore" &&
+    "${tools}/gitleaks" git --config="${workspace}/gitleaks.toml" --gitleaks-ignore-path="${workspace}/gitleaks-ignore" \
+      --ignore-gitleaks-allow --max-archive-depth=8 --log-opts="--full-history --all --diff-merges=remerge" \
+      --no-banner --no-color --redact --verbose .
 }
 
 check_links() {
   local listing
   listing="$(git ls-files --cached --others --exclude-standard -- '*.md')" || return
-  "${tools}/lychee" --offline --no-progress --include-fragments --files-from - <<<"${listing}"
+  : >"${workspace}/lychee.toml" &&
+    "${tools}/lychee" --config="${workspace}/lychee.toml" --offline --no-progress --include-fragments=full \
+      --include-verbatim --include-mail --files-from - <<<"${listing}"
 }
 
 lint_prose() {
-  local listing files=()
+  local listing files=() status=0
   listing="$(git ls-files --cached --others --exclude-standard -- '*.md')" || return
   mapfile -t files <<<"${listing}"
-  "${tools}/vale" --output=line "${files[@]}"
+  "${tools}/vale" --output=line "${files[@]}" >"${workspace}/vale.log" || status=$?
+  [[ ! -s "${workspace}/vale.log" ]] || {
+    cat "${workspace}/vale.log" >&2
+    return 1
+  }
+  return "${status}"
+}
+
+run_tests() {
+  local results="${workspace}/tests.json"
+  npx vitest run --coverage --reporter=default --reporter=json --outputFile.json="${results}" || return
+  jq -e '.numPendingTests == 0 and .numTodoTests == 0' "${results}" >/dev/null || {
+    jq -r '.testResults[].assertionResults[] | select(.status != "passed") | "\(.status) \(.fullName)"' "${results}" >&2
+    echo "The run skipped the tests above, so it did not run every test." >&2
+    return 1
+  }
 }
 
 generate_code() {
@@ -201,6 +238,20 @@ package_contents() {
   ! jq -e '.[0].files | map(.path) | any(test("(^|/)\\.env"))' <<<"${listing}" >/dev/null
 }
 
+lint_package() {
+  local report tarball
+  report="$(npx publint --strict --level suggestion 2>&1)" || {
+    echo "${report}" >&2
+    return 1
+  }
+  [[ "${report}" != *Suggestions:* && "${report}" != *Warnings:* && "${report}" != *Errors:* ]] || {
+    echo "${report}" >&2
+    return 1
+  }
+  tarball="$(npm pack --ignore-scripts --silent --pack-destination "${workspace}")" &&
+    npx attw "${workspace}/${tarball}" --profile esm-only
+}
+
 run_codeql() {
   local source="${workspace}/codeql-source" database="${workspace}/codeql-database"
   local results="${workspace}/codeql-results.sarif" diagnostic="js/diagnostics/extraction-errors"
@@ -256,8 +307,7 @@ run_check "shellcheck" "Shell lint with every optional shellcheck check" "Fix th
 run_check "REUSE" "Licensing with REUSE lint" \
   "Give each file listed above a license and copyright in REUSE.toml or an SPDX header." \
   uv tool run --from "reuse==${reuse_version}" reuse lint
-run_check "gitleaks" "Secret scan of every commit" "Remove each secret above and rotate it." \
-  "${tools}/gitleaks" git --no-banner --no-color --redact --verbose .
+run_check "gitleaks" "Secret scan of every commit on every ref" "Remove each secret above and rotate it." scan_secrets
 run_check "lychee" "Link check of every Markdown file" "Fix each broken link or anchor above." check_links
 run_check "vale" "Prose lint of every Markdown file" "Rewrite each sentence Vale lists above." lint_prose
 run_check "" "Convex code generation on a local deployment" \
@@ -273,10 +323,12 @@ run_check "100% typed" "Type coverage" "Give each value listed above a type with
 run_check "audit" "Dependency audit and registry signatures" "Upgrade each package named above, then rerun." \
   audit_dependencies
 run_check "100% coverage" "Tests with 100% line, branch, function and statement coverage" \
-  "Fix the failing tests or test the lines listed above." npx vitest run --coverage
+  "Fix the failing tests, run the skipped ones, or test the lines listed above." run_tests
 run_check "100% mutation score" "Mutation testing" "Write a test that kills each surviving mutant above." \
   npx stryker run
 run_check "package" "Package contents" "Fix the files list in package.json." package_contents
+run_check "publint and attw" "Package lint with publint and Are the Types Wrong" \
+  "Fix the package.json fields or exports named above." lint_package
 run_check "CodeQL" "Static analysis with the CodeQL security-extended queries" \
   "Fix the CodeQL findings above, then rerun." run_codeql
 

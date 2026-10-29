@@ -18,3 +18,7 @@
 \\u(?:2014|\{0*2014\})
 (?i:&[m]dash;|&#0*8212;|&#x0*2014;)
 ["'][o]ff["']
+[t]ype-coverage:ignore
+<!--\s*[v]ale\s
+[o]xlint-(?:disable|enable)
+[i]gnorers"?\s*:

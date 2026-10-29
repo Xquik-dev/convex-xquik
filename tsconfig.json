@@ -19,6 +19,8 @@
     "erasableSyntaxOnly": true,
     "verbatimModuleSyntax": true,
     "isolatedModules": true,
+    "moduleDetection": "force",
+    "noUncheckedSideEffectImports": true,
     "resolveJsonModule": true,
     "allowJs": true,
     "checkJs": true,
