@@ -82,7 +82,7 @@ file="$(jq -r -e '.[0].filename' <<<"${packed}")"
 archive="${workspace}/${file}"
 jq -e --arg name "${expected_name}" --arg version "${version}" '.[0] | .name == $name and .version == $version' \
   <<<"${packed}" >/dev/null || fail "npm pack wrote a package other than ${expected_name}@${version}."
-changes="$(git status --porcelain)"
+changes="$(git status --porcelain --untracked-files=no)"
 [[ -z "${changes}" ]] || fail "The build changed tracked files. Commit the change, then rerun."
 
 if ${dry_run}; then
