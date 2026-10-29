@@ -9,10 +9,11 @@
 - Add the `default` target `dist/component/_generated/component.js` to both `_generated/component` exports.
 - Document the methods of the `Xquik` client class.
 - Mark the README part that the Convex components directory shows.
+- Publish the package as `xquik-convex` from the renamed repository Xquik-dev/xquik-convex.
 
 ## 0.1.0
 
 - Add the Xquik Convex component with 1 typed action for each of the 190 public operations.
 - Add the webhook receiver. It checks each signature, refuses replayed nonces & stores each event once.
 - Add live, paginated event queries and durable jobs with retries, schedule keys & repeats.
-- Add the `Xquik` client class, the `convex-xquik/test` helper & the example app.
+- Add the `Xquik` client class, the `xquik-convex/test` helper & the example app.

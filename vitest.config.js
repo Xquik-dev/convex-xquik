@@ -16,10 +16,10 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^convex-xquik\/convex\.config\.js$/,
+        find: /^xquik-convex\/convex\.config\.js$/,
         replacement: fileURLToPath(new URL("src/component/convex.config.ts", import.meta.url)),
       },
-      { find: /^convex-xquik$/, replacement: fileURLToPath(new URL("src/client/index.ts", import.meta.url)) },
+      { find: /^xquik-convex$/, replacement: fileURLToPath(new URL("src/client/index.ts", import.meta.url)) },
     ],
   },
   test: {

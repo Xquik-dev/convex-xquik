@@ -6,8 +6,8 @@ set -euo pipefail
 script_directory="$(dirname "$0")"
 cd "${script_directory}/.."
 
-readonly expected_name="convex-xquik"
-readonly repository="Xquik-dev/convex-xquik"
+readonly expected_name="xquik-convex"
+readonly repository="Xquik-dev/xquik-convex"
 readonly registry="https://registry.npmjs.org/"
 
 dry_run=false
@@ -62,7 +62,7 @@ tagged="$(git rev-parse --quiet --verify "refs/tags/${tag}^{commit}" || true)"
 [[ -z "${tagged}" || "${tagged}" == "${head_commit}" ]] ||
   fail "${tag} marks ${tagged:0:12}, not main. Raise the version in package.json and CHANGELOG.md first."
 
-workspace="$(mktemp -d "${TMPDIR:-/tmp}/convex-xquik-release.XXXXXX")"
+workspace="$(mktemp -d "${TMPDIR:-/tmp}/xquik-convex-release.XXXXXX")"
 trap 'rm -rf -- "${workspace:?}"' EXIT
 
 step "Reading the ${version} notes from CHANGELOG.md"

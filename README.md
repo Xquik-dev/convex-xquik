@@ -1,6 +1,6 @@
 # Twitter API & X data in Convex with Xquik
 
-[![Convex Component](https://www.convex.dev/components/badge/convex-xquik)](https://www.convex.dev/components/convex-xquik)
+[![Convex Component](https://www.convex.dev/components/badge/xquik-convex)](https://www.convex.dev/components/xquik-convex)
 
 A Convex component for every public Xquik X API operation, signed webhooks & live event queries.
 
@@ -50,7 +50,7 @@ Read the full guide at [docs.xquik.com/guides/convex](https://docs.xquik.com/gui
 ## Install
 
 ```bash
-npm install convex-xquik
+npm install xquik-convex
 ```
 
 Add the component in `convex/convex.config.ts`.
@@ -58,7 +58,7 @@ Add the component in `convex/convex.config.ts`.
 ```ts
 import { defineApp } from "convex/server";
 import { v } from "convex/values";
-import xquik from "convex-xquik/convex.config.js";
+import xquik from "xquik-convex/convex.config.js";
 
 const app = defineApp({ env: { XQUIK_API_KEY: v.optional(v.string()) } });
 app.use(xquik, { httpPrefix: "/xquik/", env: { XQUIK_API_KEY: app.env.XQUIK_API_KEY } });
@@ -89,12 +89,12 @@ export const latest = internalAction({
 
 Call `components.xquik.operations.getUser` with `{ id: "elonmusk" }` for a profile. A failed call throws a `ConvexError`. Its data has `status`, `error`, `message` & `retryAfter` in seconds for a 429.
 
-Each result has the type & the validator of its schema in the API reference, so the `name` of a `getUser` result is a `string`. The result holds only the fields that schema lists. A JSON-LD key such as `@id` arrives as `id`. Import `OperationResult<"getUser">` from `convex-xquik` to name a result type.
+Each result has the type & the validator of its schema in the API reference, so the `name` of a `getUser` result is a `string`. The result holds only the fields that schema lists. A JSON-LD key such as `@id` arrives as `id`. Import `OperationResult<"getUser">` from `xquik-convex` to name a result type.
 
 ## Receive webhook events
 
 ```ts
-import { Xquik, eventFields } from "convex-xquik";
+import { Xquik, eventFields } from "xquik-convex";
 import { v } from "convex/values";
 import { components, internal } from "./_generated/api";
 import { internalAction, internalMutation } from "./_generated/server";
@@ -147,13 +147,13 @@ While a job with the same `key` is scheduled or running, the call returns that j
 
 ## Keep credits safe
 
-Component functions run only from your backend. Wrap them in internal functions, or check the caller's identity & rate limit in each public function that spends credits. The [example app](https://github.com/Xquik-dev/convex-xquik/tree/main/example) keeps every credit-spending function internal.
+Component functions run only from your backend. Wrap them in internal functions, or check the caller's identity & rate limit in each public function that spends credits. The [example app](https://github.com/Xquik-dev/xquik-convex/tree/main/example) keeps every credit-spending function internal.
 
 ## Test your app
 
 ```ts
 import { convexTest } from "convex-test";
-import xquikTest from "convex-xquik/test";
+import xquikTest from "xquik-convex/test";
 
 const t = convexTest(schema, modules);
 xquikTest.register(t);
