@@ -1,0 +1,7 @@
+ruleDirs:
+  - lint/rules
+testConfigs:
+  - testDir: lint/rule-tests
+languageGlobs:
+  typescript:
+    - "*.js"

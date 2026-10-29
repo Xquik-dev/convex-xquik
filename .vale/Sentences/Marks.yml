@@ -10,4 +10,4 @@ scope:
 nonword: true
 tokens:
   - ':(?=\s|$)'
-  - ';'
+  - ";"

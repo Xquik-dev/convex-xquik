@@ -1,0 +1,19 @@
+id: no-code-comments
+language: TypeScript
+severity: error
+message: Code has no comments. Put the meaning in names, types and tests.
+note: A comment stays only with an https link to the doc, source, RFC or issue that proves it, an SPDX tag, a triple-slash reference or a PURE or NO_SIDE_EFFECTS annotation. A comment directly above a linked one in the same block stays too.
+rule:
+  kind: comment
+  not:
+    any:
+      - regex: https://
+      - regex: '^///\s*<reference\s'
+      - regex: '[#@]__(PURE|NO_SIDE_EFFECTS)__'
+      - regex: SPDX-(License-Identifier|FileCopyrightText)
+      - precedes:
+          kind: comment
+          regex: https://
+          stopBy:
+            not:
+              kind: comment

@@ -1,0 +1,42 @@
+id: no-code-comments
+valid:
+  - |
+    // Convex removes a field only when patch passes it undefined.
+    // https://docs.convex.dev/database/writing-data#updating-existing-documents
+    const flush = 1;
+  - |
+    /**
+     * Schedules an operation as a durable job.
+     *
+     * @see https://docs.xquik.com/guides/convex
+     */
+    function schedule(): void {}
+  - '/// <reference types="node" />'
+  - "const store = /* #__PURE__ */ makeStore();"
+  - "const store = /* @__NO_SIDE_EFFECTS__ */ makeStore();"
+  - |
+    // SPDX-FileCopyrightText: 2026 Xquik Contributors
+    // SPDX-License-Identifier: Apache-2.0
+    const licensed = 1;
+  - "const quiet = 1;"
+invalid:
+  - |
+    // Explains what the next line does.
+    const total = 1;
+  - "const total = 1; // says what total is"
+  - |
+    /** Describes an export only this app uses. */
+    export function total(): number {
+      return 1;
+    }
+  - |
+    // First line of a block.
+    // Second line, still no proof.
+    const total = 1;
+  - "const total = add(/* first */ 1, 2);"
+  - |
+    // A link in a later block proves nothing here.
+    const total = 1;
+    // https://docs.convex.dev/functions/validation
+    const other = 2;
+  - "// @vitest-environment node"

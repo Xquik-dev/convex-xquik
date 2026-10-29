@@ -11,27 +11,30 @@ bin/check-local
 1. `npm ci` installs the locked dependencies.
 2. `git grep` bans each pattern in `lint/banned-patterns.txt` in every file. The list covers every suppression comment, exclusion key, rule switched off and skipped test. The step also fails on any `.*ignore` file other than `.gitignore`, since lychee and Prettier read those whatever their flags say.
 3. shellcheck lints every shell script with every optional check turned on. It finds each script by its `.sh` or `.bash` name or its shebang.
-4. REUSE 6.2.0 checks that every file has a license and a copyright.
-5. gitleaks scans every commit on every ref for secrets, archives included. It reads only its default rules and ignores inline allow comments.
-6. lychee checks every relative link, anchor and code link in the Markdown files offline, with an empty configuration.
-7. Vale checks the prose and spelling of the Markdown files. Any alert fails, suggestions included. `.vale/config/vocabularies/Xquik/accept.txt` lists the words its dictionary lacks.
-8. The Convex CLI generates the component and example code on a local deployment.
-9. `npm run generate` must leave `src/component/registry.json` and `src/component/operations.ts` unchanged.
-10. Prettier checks the format of every TypeScript, JavaScript and Markdown file.
-11. `tsc` checks the types with strict options and `moduleDetection` `force`. It also checks the JavaScript configuration files.
-12. ESLint runs the strict type-checked rules and every Convex rule on every file, and `test/lint.test.ts` fails when a file runs a Convex rule below `error`. ESLint bans `any`, type assertions and non-null assertions. Each public component function calls `requireApiKey` first, so it throws `missing_api_key` until the deployment sets `XQUIK_API_KEY`.
-13. oxlint runs type-aware on every file, with every rule of its 13 plugins at `error`. `test/lint.test.ts` fails when a rule that oxlint registers for those plugins runs below `error`. It exempts the 10 rules it names, each with the rule or Convex requirement it contradicts, and the 1 rule the ban list matches.
-14. type-coverage needs every value of every tracked file typed without `any`.
-15. `npm audit` checks the dependencies, and `npm audit signatures` checks their registry signatures.
-16. Vitest runs every test, and a skipped test or a test marked to do later fails the step. The tests must run every line, branch, function and statement of every tracked source file.
-17. Stryker must kill every mutant of every tracked source file, with the TypeScript checker on.
-18. `npm pack` must hold the files that apps import.
-19. publint finds no error, warning or suggestion in the package, and Are the Types Wrong resolves every export for ESM apps and build tools.
-20. CodeQL runs its security-extended queries over the tracked files.
+4. ast-grep runs the rule in `lint/rules/no-code-comments.yml` over every TypeScript and JavaScript file, after its cases in `lint/rule-tests` pass. A comment stays only with an https link to the page that proves it, an SPDX tag, a `/// <reference` line or a `PURE` or `NO_SIDE_EFFECTS` annotation, or right above such a linked comment.
+5. REUSE 6.2.0 checks that every file has a license and a copyright.
+6. gitleaks scans every commit on every ref for secrets, archives included. It reads only its default rules and ignores inline allow comments.
+7. lychee checks every relative link, anchor and code link in the Markdown files offline, with an empty configuration.
+8. Vale checks the prose and spelling of the Markdown files. Any alert fails, suggestions included. `.vale/config/vocabularies/Xquik/accept.txt` lists the words its dictionary lacks.
+9. The Convex CLI generates the component and example code on a local deployment.
+10. `npm run generate` must leave `src/component/registry.json` and `src/component/operations.ts` unchanged. The generator writes both in Prettier's format.
+11. Prettier checks the format of every TypeScript, JavaScript, Markdown, JSON and YAML file.
+12. `tsc` checks the types with strict options and `moduleDetection` `force`. It also checks the JavaScript configuration files.
+13. ESLint runs the strict type-checked rules and every Convex rule on every file. ESLint bans `any`, type assertions and non-null assertions. Each public component function calls `requireApiKey` first, so it throws `missing_api_key` until the deployment sets `XQUIK_API_KEY`.
+14. oxlint runs type-aware on every file, with every rule of its 13 plugins at `error`. `import/no-nodejs-modules` keeps Node built-in modules out of every file, so the component, the generator and the tests run on Web APIs alone.
+15. The lint settings step fails when a file runs one of the 11 Convex rules below `error`, or when a rule that oxlint registers for its 13 plugins runs below `error`. `lint/left-out-rules.json` names each exempt rule with the requirement it contradicts.
+16. fallow fails on a function over its complexity limits in `.fallowrc.json`, on any duplicated block, and on an unused file, export or dependency. Convex loads every module in `src/component`, so `.fallowrc.json` names them as entry points.
+17. type-coverage needs every value of every tracked file typed without `any`.
+18. `npm audit` checks the dependencies, and `npm audit signatures` checks their registry signatures.
+19. Vitest runs every test, and a skipped test or a test marked to do later fails the step. The tests must run every line, branch, function and statement of every tracked source file in `src`, `scripts` and `example`, which `npm test` lists with `git ls-files`.
+20. Stryker must kill every mutant of the same files, with the TypeScript checker on.
+21. `npm pack` must hold the files that apps import.
+22. publint finds no error, warning or suggestion in the package, and Are the Types Wrong resolves every export for ESM apps and build tools.
+23. CodeQL runs its security-extended queries over the tracked files.
 
 Fix what a check finds. Never suppress a finding or narrow a check.
 
-The checks need Node, npm, jq, curl, uv and CodeQL on your PATH. They download the pinned shellcheck, gitleaks, lychee and Vale from `tools.json` and check each download's SHA-256.
+The checks need Node, npm, jq, curl, uv and CodeQL on your PATH. They download the pinned ast-grep, shellcheck, gitleaks, lychee and Vale from `tools.json` and check each download's SHA-256.
 
 ## Update the operations
 

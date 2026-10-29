@@ -1,4 +1,18 @@
 {
+  "ast-grep": {
+    "version": "0.51.0",
+    "binary": "ast-grep",
+    "downloads": {
+      "darwin-arm64": {
+        "sha256": "12e7448a1883cb2329e1f881ea22604f3541c99a09dd67f9b92b86ec8d97c7c0",
+        "url": "https://registry.npmjs.org/@ast-grep/cli-darwin-arm64/-/cli-darwin-arm64-{version}.tgz"
+      },
+      "linux-x64": {
+        "sha256": "bbd6f6ea8b2e3ef0a662948a10f8120a3ee7f16a785fabdd68316f102b0ad125",
+        "url": "https://registry.npmjs.org/@ast-grep/cli-linux-x64-gnu/-/cli-linux-x64-gnu-{version}.tgz"
+      }
+    }
+  },
   "gitleaks": {
     "version": "8.30.1",
     "binary": "gitleaks",

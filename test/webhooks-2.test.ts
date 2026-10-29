@@ -37,11 +37,10 @@ describe("creating webhooks through Xquik", () => {
     expect(recorded.map((request): unknown => JSON.parse(request.body))).toStrictEqual([
       { eventTypes: ["tweet.new"], url: created.url },
     ]);
-    const { status } = await backend.fetch(pathOf(created.url), {
-      body: TEST_ALERT,
-      headers: sign(TEST_ALERT).headers,
-      method: "POST",
-    });
+    const { status } = await backend.fetch(
+      pathOf(created.url),
+      Object.assign(await sign(TEST_ALERT), { method: "POST" }),
+    );
     expect(status).toBe(OK);
     const { page } = await backend.query(api.webhooks.list, PAGE);
     expect(
@@ -95,7 +94,7 @@ describe("removing webhooks through Xquik", () => {
 describe("signature checks", () => {
   it("check accepts only a matching HMAC over the raw bytes", { timeout: 5000 }, async () => {
     expect.hasAssertions();
-    const signed = sign("{}");
+    const signed = await sign("{}");
     await expect(check(SECRET, new Headers(signed.headers), encoded(signed.body), Date.now())).resolves.toStrictEqual({
       nonce: signed.headers["x-xquik-nonce"],
       ok: true,
@@ -106,7 +105,7 @@ describe("signature checks", () => {
     expect.hasAssertions();
     const now = Date.parse("2026-10-28T19:00:00.000Z");
     const at = async (timestamp: number): Promise<unknown> => {
-      const { headers } = sign("{}", { timestamp: String(timestamp) });
+      const { headers } = await sign("{}", { timestamp: String(timestamp) });
       return await check(SECRET, new Headers(headers), encoded("{}"), now);
     };
     await expect(at(now - FIVE_MINUTES_MS)).resolves.toMatchObject({ ok: true });
@@ -119,7 +118,7 @@ describe("signature checks", () => {
     const now = Date.now();
     const nonce = "ab".repeat(NONCE_BYTES);
     const verdict = async (options: { readonly nonce?: string; readonly timestamp?: string }): Promise<unknown> => {
-      const { headers } = sign("{}", options);
+      const { headers } = await sign("{}", options);
       return await check(SECRET, new Headers(headers), encoded("{}"), now);
     };
     await expect(verdict({ timestamp: `x${String(now)}` })).resolves.toStrictEqual(STALE);
@@ -132,7 +131,7 @@ describe("signature checks", () => {
 describe("signature header checks", () => {
   it("check refuses a signature with extra characters", { timeout: 5000 }, async () => {
     expect.hasAssertions();
-    const signed = sign("{}");
+    const signed = await sign("{}");
     const signature = String(signed.headers["x-xquik-signature"]);
     const verdict = async (changed: string): Promise<unknown> => {
       const headers = Object.fromEntries([...Object.entries(signed.headers), ["x-xquik-signature", changed]]);
@@ -144,8 +143,8 @@ describe("signature header checks", () => {
 
   it("check keeps the signing secret in a key that cannot be exported", { timeout: 5000 }, async () => {
     expect.hasAssertions();
+    const signed = await sign("{}");
     using importKey = vi.spyOn(crypto.subtle, "importKey");
-    const signed = sign("{}");
     await check(SECRET, new Headers(signed.headers), encoded(signed.body), Date.now());
     expect(importKey).toHaveBeenCalledExactlyOnceWith("raw", expect.anything(), expect.anything(), false, ["verify"]);
   });

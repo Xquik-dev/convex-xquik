@@ -65,9 +65,9 @@ exceptions:
   - 'X(?: \(Twitter\))?(?: [A-Z][a-z]+)+ (?:Downloader|Scraper)'
   - 'X(?: \(Twitter\))?(?: [A-Z][a-z]+)+ (?:Analyzer|Classifier|Monitor|Tracker)'
   - '\d+\.\d+\.\d+,? [a-z]+'
-  - '[a-z]+(?:[A-Z][a-z0-9]*)+'
+  - "[a-z]+(?:[A-Z][a-z0-9]*)+"
   - Media Downloader
-  - 'X Tweet Sentiment Analysis with AI'
+  - "X Tweet Sentiment Analysis with AI"
   - 'X \(Twitter\) Brand Monitoring with AI Analysis'
   - 'X \(Twitter\) Stock & Crypto AI Trading Signals'
   - Search API

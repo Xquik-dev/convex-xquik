@@ -1,0 +1,6 @@
+{
+  "failOnParseError": true,
+  "entry": ["src/component/**/*.ts"],
+  "duplicates": { "minTokens": 45, "minLines": 1, "threshold": 0.0001 },
+  "health": { "maxCyclomatic": 20, "maxCognitive": 15, "maxCrap": 0 }
+}

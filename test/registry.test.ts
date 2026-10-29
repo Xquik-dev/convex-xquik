@@ -1,9 +1,7 @@
 import { bodyRegistry, json, post, spec } from "./registry-specs.ts";
-import { copyFile, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
 import { describe, expect, it } from "vitest";
-import { eventTypes, readRegistry, writeGenerated } from "#scripts/registry.ts";
+import { eventTypes, operationsModule, readRegistry, registryJson } from "#scripts/registry.ts";
 import { parseRegistry } from "#src/component/shape.ts";
-import { tmpdir } from "node:os";
 
 interface Generated {
   readonly ids: readonly string[];
@@ -84,17 +82,8 @@ const NODE_SCHEMAS = { Node: { properties: { next: { $ref: "#/components/schemas
 const DONE_THEN_LOOP = { done: { $ref: "#/components/schemas/Done" }, loop: { $ref: "#/components/schemas/Loop" } };
 
 async function generate(): Promise<Generated> {
-  const work = await mkdtemp(`${tmpdir()}/xquik-convex-`);
-  try {
-    await mkdir(`${work}/src/component`, { recursive: true });
-    await copyFile(new URL("../openapi.json", import.meta.url), `${work}/openapi.json`);
-    await writeGenerated(work);
-    const registry: unknown = JSON.parse(await readFile(`${work}/src/component/registry.json`, "utf8"));
-    const operations = await readFile(`${work}/src/component/operations.ts`, "utf8");
-    return { ids: Object.keys(parseRegistry(registry).operations), operations: operations.split("\n") };
-  } finally {
-    await rm(work, { force: true, recursive: true });
-  }
+  const registry: unknown = JSON.parse(await registryJson());
+  return { ids: Object.keys(parseRegistry(registry).operations), operations: operationsModule().split("\n") };
 }
 
 function ok(schema: unknown): unknown {

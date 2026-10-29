@@ -3,4 +3,4 @@ message: "Replace the curly quote '%s' with a straight one."
 level: error
 nonword: true
 tokens:
-  - '[“”‘’]'
+  - "[“”‘’]"

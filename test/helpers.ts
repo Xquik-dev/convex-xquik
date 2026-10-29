@@ -1,6 +1,5 @@
 import { ConvexError } from "convex/values";
 import { convexTest } from "convex-test";
-import { createHmac } from "node:crypto";
 import schema from "#src/component/schema.ts";
 import spec from "#openapi.json" with { type: "json" };
 import type { TestConvex } from "convex-test";
@@ -8,11 +7,15 @@ import type { Value } from "convex/values";
 import { vi } from "vitest";
 
 const SECRET_BYTES = 32;
+const HEX_RADIX = 16;
+const HEX_DIGITS = 2;
 
 const modules = import.meta.glob("#src/component/**/*.ts");
 
 const SECRET = "ab".repeat(SECRET_BYTES);
 const SITE = "https://happy-otter-123.convex.site/xquik";
+
+const encoder = new TextEncoder();
 
 function componentTest(): TestConvex<typeof schema> {
   vi.stubEnv("XQUIK_API_KEY", "xq_test");
@@ -25,15 +28,19 @@ interface Signed {
   readonly body: string;
 }
 
-function sign(
+function hex(bytes: Readonly<ArrayBuffer>): string {
+  return Array.from(new Uint8Array(bytes), (byte) => byte.toString(HEX_RADIX).padStart(HEX_DIGITS, "0")).join("");
+}
+
+async function sign(
   body: string,
   options: { readonly secret?: string; readonly timestamp?: string; readonly nonce?: string } = {},
-): Signed {
+): Promise<Signed> {
   const timestamp = options.timestamp ?? String(Date.now());
   const nonce = options.nonce ?? crypto.randomUUID().replaceAll("-", "");
-  const mac = createHmac("sha256", options.secret ?? SECRET)
-    .update(`${timestamp}.${nonce}.${body}`)
-    .digest("hex");
+  const secret = encoder.encode(options.secret ?? SECRET);
+  const key = await crypto.subtle.importKey("raw", secret, { hash: "SHA-256", name: "HMAC" }, false, ["sign"]);
+  const mac = hex(await crypto.subtle.sign("HMAC", key, encoder.encode(`${timestamp}.${nonce}.${body}`)));
   return {
     body,
     headers: {
@@ -116,5 +123,5 @@ async function rejection(promise: Readonly<Promise<unknown>>): Promise<unknown> 
   return await promise.then(() => "resolved", rejectionValue);
 }
 
-export { componentTest, delivery, modules, readSpec, rejection, SECRET, sign, SITE, stubFetch, TEST_ALERT };
+export { componentTest, delivery, readSpec, rejection, SECRET, sign, SITE, stubFetch, TEST_ALERT };
 export type { Recorded, Signed };

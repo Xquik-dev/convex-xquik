@@ -164,5 +164,5 @@ async function send(operation: Operation, args: Inputs, options: Options): Promi
 }
 
 export * from "./registry.js";
-export { BASE_URL, events, parse, parseOrText, send };
+export { events, parse, parseOrText, send };
 export type { Args, Options };

@@ -101,5 +101,5 @@ function pulledEvents(result: unknown): EventFields[] {
   return result["events"].flatMap((item) => readEvent(item, { id: "id", type: "type" }) ?? []);
 }
 
-export { check, NONCE_TTL_MS, pulledEvents, readDelivery, readEvent, TOLERANCE_MS };
+export { check, NONCE_TTL_MS, pulledEvents, readDelivery };
 export type { Check, Delivery };

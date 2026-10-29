@@ -124,17 +124,5 @@ function failed(definition: Operation, error: unknown): Failure {
   return { error: data, ok: false, retryable };
 }
 
-export {
-  failed,
-  isLive,
-  isScheduled,
-  jobDoc,
-  MAX_ATTEMPTS,
-  MIN_EVERY_MS,
-  outcome,
-  plan,
-  requireInterval,
-  runsAfter,
-  unexpected,
-};
+export { failed, isLive, isScheduled, jobDoc, outcome, plan, requireInterval, runsAfter, unexpected };
 export type { Attempt, Failure, Outcome, Plan };
