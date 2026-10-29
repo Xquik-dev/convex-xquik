@@ -1022,8 +1022,7 @@
       }
     ],
     "vitest/warn-todo": "error"
-  }
-,
+  },
   "overrides": [
     {
       "files": [
