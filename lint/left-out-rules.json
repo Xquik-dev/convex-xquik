@@ -1,16 +1,46 @@
 {
   "import/no-default-export": {
-    "reason": "Convex codegen fails unless convex.config.ts has a default export."
+    "reason": "Convex codegen fails unless convex.config.ts has a default export.",
+    "proof": "https://github.com/Xquik-dev/xquik-convex/pull/9#issuecomment-6491379085"
   },
   "import/no-named-export": {
-    "reason": "Convex names each function after its export, so a default export renames events.list."
+    "reason": "Convex names each function after its export, so a default export renames events.list.",
+    "proof": "https://github.com/Xquik-dev/xquik-convex/pull/9#issuecomment-6491379085"
   },
   "oxc/no-async-await": {
     "reason": "A mutation must await what it reads, and the then and plain Promise forms fail other rules.",
+    "proof": "https://github.com/Xquik-dev/xquik-convex/pull/9#issuecomment-6491379085",
     "clashes": ["promise/prefer-await-to-then", "typescript/promise-function-async"]
   },
+  "unicorn/no-null": {
+    "reason": "Convex's contract and Xquik's API carry JSON null, as in webhooks.list's testedAt and the first page's cursor.",
+    "proof": "https://github.com/Xquik-dev/xquik-convex/pull/9#issuecomment-1",
+    "files": {
+      "scripts/nodes.ts": 1,
+      "scripts/reader.ts": 1,
+      "src/component/request.ts": 2,
+      "src/component/shape.ts": 1,
+      "src/component/values.ts": 1,
+      "src/component/webhooks.ts": 2,
+      "test/access.test.ts": 1,
+      "test/coverage.test.ts": 6,
+      "test/events.test.ts": 6,
+      "test/example.test.ts": 4,
+      "test/jobs-rules.test.ts": 9,
+      "test/jobs.test.ts": 3,
+      "test/properties.test.ts": 1,
+      "test/registry-parser.test.ts": 4,
+      "test/registry-shapes.test.ts": 1,
+      "test/registry.test.ts": 3,
+      "test/request-shapes.test.ts": 8,
+      "test/request.test.ts": 2,
+      "test/webhooks-2.test.ts": 2,
+      "test/webhooks.test.ts": 6
+    }
+  },
   "vitest/no-importing-vitest-globals": {
-    "reason": "An alias such as it as check hides each test from require-hook and expect-expect.",
+    "reason": "An alias such as it as check passes only when expect-expect and require-hook name it in their options, which hides 3 exceptions in place of this 1.",
+    "proof": "https://github.com/Xquik-dev/xquik-convex/pull/9#issuecomment-1",
     "clashes": ["vitest/prefer-importing-vitest-globals"]
   }
 }

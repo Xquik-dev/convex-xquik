@@ -1023,4 +1023,32 @@
     ],
     "vitest/warn-todo": "error"
   }
+,
+  "overrides": [
+    {
+      "files": [
+        "scripts/nodes.ts",
+        "scripts/reader.ts",
+        "src/component/request.ts",
+        "src/component/shape.ts",
+        "src/component/values.ts",
+        "src/component/webhooks.ts",
+        "test/access.test.ts",
+        "test/coverage.test.ts",
+        "test/events.test.ts",
+        "test/example.test.ts",
+        "test/jobs-rules.test.ts",
+        "test/jobs.test.ts",
+        "test/properties.test.ts",
+        "test/registry-parser.test.ts",
+        "test/registry-shapes.test.ts",
+        "test/registry.test.ts",
+        "test/request-shapes.test.ts",
+        "test/request.test.ts",
+        "test/webhooks-2.test.ts",
+        "test/webhooks.test.ts"
+      ],
+      "rules": { "unicorn/no-null": "off" }
+    }
+  ]
 }
