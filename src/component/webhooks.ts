@@ -3,10 +3,10 @@ import { argument, find, send } from "./request.js";
 import { ConvexError, v } from "convex/values";
 import { deliveryValidator, NONCE_TTL_MS } from "./delivery.js";
 import type { GenericId, Infer } from "convex/values";
-import { isRecord, none } from "./shape.js";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import type { FunctionHandle } from "convex/server";
 import { internal } from "./_generated/api.js";
+import { isRecord } from "./shape.js";
 import type { MutationCtx } from "./_generated/server.js";
 import requireApiKey from "./access.js";
 import schema from "./schema.js";
@@ -62,7 +62,7 @@ async function store(ctx: EventWriter, event: EventFields): Promise<void> {
     .query("events")
     .withIndex("by_stream_event", (range) => range.eq("streamEventId", event.streamEventId))
     .unique();
-  if (!existing) {
+  if (existing === null) {
     await ctx.db.insert("events", event);
   }
 }
@@ -83,7 +83,7 @@ async function accept(
   await ctx.db.insert("receipts", { endpointId, streamEventId });
   await store(ctx, event);
   const found = await ctx.db.get("endpoints", endpointId);
-  if (found && typeof found.onEvent === "string" && isHandle(found.onEvent)) {
+  if (found !== null && typeof found.onEvent === "string" && isHandle(found.onEvent)) {
     await ctx.scheduler.runAfter(IMMEDIATELY, found.onEvent, { event });
   }
   return "stored";
@@ -147,9 +147,9 @@ const list = query({
     return Object.assign(endpoints, {
       page: endpoints.page.map(({ _id, testedAt, token, webhookId }) => ({
         endpointId: _id,
-        testedAt: testedAt ?? none,
+        testedAt: testedAt ?? null,
         url: urlOf(token),
-        webhookId: webhookId ?? none,
+        webhookId: webhookId ?? null,
       })),
     });
   },
@@ -170,8 +170,8 @@ const webhookOf = internalQuery({
   args: { endpointId: v.id("endpoints") },
   handler: async (ctx, { endpointId }) => {
     const found = await ctx.db.get("endpoints", endpointId);
-    if (!found) {
-      return found;
+    if (found === null) {
+      return null;
     }
     return found.webhookId;
   },

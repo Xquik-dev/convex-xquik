@@ -125,7 +125,10 @@ install_tool() {
 
 no_banned_patterns() {
   local ignore_files
-  git grep -nIP --untracked -f lint/banned-patterns.txt
+  jq 'del(.overrides[]?.rules)' .oxlintrc.json >"${workspace}/oxlintrc-without-override-rules.json" || return
+  git grep -nIP --untracked -f lint/banned-patterns.txt -- ':(exclude).oxlintrc.json'
+  (($? == 1)) || return 1
+  (cd "${workspace}" && git grep --no-index -nIP -f "${root}/lint/banned-patterns.txt" -- oxlintrc-without-override-rules.json)
   (($? == 1)) || return 1
   ignore_files="$(git ls-files --cached --others --exclude-standard -- ':(glob)**/.*ignore' ':(exclude,glob)**/.gitignore')" ||
     return
@@ -215,7 +218,7 @@ ban_comments() {
 }
 
 lint_settings() {
-  local listing files=() eslint_report oxlint_report
+  local listing files=() eslint_report oxlint_report scoped rules=() rule paths=() counts
   listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js')" || return
   mapfile -t files <<<"${listing}"
   eslint_report="$(node --input-type=module --eval '
@@ -235,31 +238,59 @@ lint_settings() {
     return 1
   }
   node_modules/.bin/oxlint --rules --format=json >"${workspace}/oxlint-rules.json" &&
-    node_modules/.bin/oxlint --print-config >"${workspace}/oxlint-config.json" || return
+    node_modules/.bin/oxlint --print-config >"${workspace}/oxlint-config.json" &&
+    git ls-files -z --cached >"${workspace}/tracked" || return
   oxlint_report="$(jq -c -n --slurpfile listed "${workspace}/oxlint-rules.json" \
     --slurpfile config "${workspace}/oxlint-config.json" --slurpfile out lint/left-out-rules.json \
-    --rawfile bans lint/banned-patterns.txt '
+    --rawfile tracked "${workspace}/tracked" --rawfile bans lint/banned-patterns.txt '
     ["eslint", "import", "jest", "jsdoc", "jsx_a11y", "nextjs", "node", "oxc", "promise", "react", "typescript",
       "unicorn", "vitest"] as $plugins
     | [$listed[0][] | select(.scope as $scope | $plugins | index($scope))
       | if .scope == "eslint" then .value else "\(.scope)/\(.value)" end] as $registered
     | [$bans | split("\n")[] | select(. != "")] as $patterns
     | [$registered[] | select(($config[0].rules[.] | if type == "array" then .[0] else . end) != "deny")] as $below
+    | [$out[0] | to_entries[] | select(.value | has("files"))] as $scoped
+    | ($tracked | split("\u0000")) as $paths
     | [$registered[] | select(. as $name | any($patterns[]; . as $pattern | try ($name | test($pattern)) catch false))]
     | {
       banned: .,
       below: $below,
       clashing: [$out[0][] | (.clashes // [])[] | select(. as $rule | ($registered - $below) | index($rule) | not)],
       reasons: ([$out[0][] | .reason | type] | unique),
-      left: ($out[0] | keys),
+      proofs: ([$out[0][] | (.proof | strings
+        | test("^https://github\\.com/Xquik-dev/xquik-convex/pull/[0-9]+#issuecomment-[0-9]+$")) // false] | unique),
+      left: [$out[0] | to_entries[] | select(.value | has("files") | not) | .key],
+      scopedOff: [$scoped[].key | select(. as $rule | $below | index($rule))],
+      overrides: ((($config[0].overrides // []) | map(.files |= sort) | sort)
+        == ([$scoped[] | {files: (.value.files | keys), env: null, globals: null, plugins: null,
+          rules: {(.key): "allow"}}] | sort)),
+      unpinnable: [$scoped[].value.files | keys[]
+        | select(test("[*?{}!\\[\\]\\\\]") or (. as $path | $paths | index($path) | not))],
       options: ($config[0].options | {denyWarnings, typeAware, typeCheck}),
       typeAware: ($registered | index("typescript/no-floating-promises") != null)
     }')" || return
-  jq -e '.banned == [] and .clashing == [] and .reasons == ["string"] and (.below | sort) == .left and .typeAware
+  jq -e '.banned == [] and .clashing == [] and .reasons == ["string"] and .proofs == [true] and (.below | sort) == .left
+    and .scopedOff == [] and .overrides and .unpinnable == [] and .typeAware
     and .options == {denyWarnings: true, typeAware: true, typeCheck: true}' <<<"${oxlint_report}" >/dev/null || {
-    echo "oxlint must run every rule of its 13 plugins at error, except the ones lint/left-out-rules.json names with a reason. Each rule they clash with must run at error. oxlint must run type-aware with the type check and fail on a warning. ${oxlint_report}" >&2
+    echo "oxlint must run every rule of its 13 plugins at error, except the ones lint/left-out-rules.json names with a reason and the link to its failing proof. Each rule the table scopes to files must run at error. Exactly 1 override must turn off only that rule, in those tracked paths, with no glob. No other override may exist. Each rule they clash with must run at error. oxlint must run type-aware with the type check and fail on a warning. ${oxlint_report}" >&2
     return 1
   }
+  scoped="$(jq -r 'to_entries[] | select(.value | has("files")) | .key' lint/left-out-rules.json)" || return
+  [[ -z "${scoped}" ]] || mapfile -t rules <<<"${scoped}"
+  for rule in "${rules[@]}"; do
+    listing="$(jq -r --arg rule "${rule}" '.[$rule].files | keys[]' lint/left-out-rules.json)" || return
+    mapfile -t paths <<<"${listing}"
+    jq --arg rule "${rule}" '{plugins, categories: {correctness: "allow"}, rules: {($rule): .rules[$rule]}}' .oxlintrc.json \
+      >"${workspace}/scoped-rule.json" || return
+    node_modules/.bin/oxlint -c "${workspace}/scoped-rule.json" --format=json "${paths[@]}" >"${workspace}/scoped.json" ||
+      (($? == 1)) || return
+    counts="$(jq -c '[.diagnostics[].filename] | group_by(.) | map({(.[0]): length}) | add // {}' "${workspace}/scoped.json")" ||
+      return
+    jq -e --arg rule "${rule}" --argjson counts "${counts}" '.[$rule].files == $counts' lint/left-out-rules.json >/dev/null || {
+      echo "lint/left-out-rules.json must pin how many ${rule} findings each file it lists holds. oxlint finds ${counts}." >&2
+      return 1
+    }
+  done
 }
 
 lint_code_health() {

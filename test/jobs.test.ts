@@ -1,7 +1,6 @@
 import { api, internal } from "#src/component/_generated/api.ts";
 import { componentTest, stubFetch } from "./helpers.js";
 import { describe, expect, it, vi } from "vitest";
-import { none } from "#src/component/shape.ts";
 
 const NO_DELAY_MS = 0;
 const NO_REQUESTS = 0;
@@ -9,7 +8,7 @@ const ONE_REQUEST = 1;
 const ALL_ATTEMPTS = 5;
 const THREE_JOBS = 3;
 const FOUR_JOBS = 4;
-const PAGE = { cursor: none, numItems: 10 };
+const PAGE = { cursor: null, numItems: 10 };
 const KEYED = { args: { id: "elonmusk" }, key: "profile", operation: "getUser" };
 const STOPPED = {
   error: { message: "The job stopped before it finished, so this call replaced it." },
@@ -123,7 +122,7 @@ describe("job results", () => {
   it("stores pulled events only from listEvents", { timeout: 10_000 }, async () => {
     expect.hasAssertions();
     const convex = componentTest();
-    const event = { data: none, id: "7", occurredAt: "2026-10-28T19:00:00.000Z", type: "tweet.new" };
+    const event = { data: null, id: "7", occurredAt: "2026-10-28T19:00:00.000Z", type: "tweet.new" };
     const jobId = await faked(async () => {
       const id = await convex.mutation(api.jobs.enqueue, { args: { id: "elonmusk" }, operation: "getUser" });
       await convex.mutation(internal.jobs.finish, { jobId: id, outcome: { ok: true, result: { events: [event] } } });
@@ -292,7 +291,7 @@ describe("deleted jobs", () => {
     const recorded = stubFetch(() => Response.json({}));
     await expect(convex.action(internal.jobs.run, { jobId })).resolves.toBeNull();
     await expect(
-      convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: none } }),
+      convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: null } }),
     ).resolves.toBeNull();
     await expect(convex.mutation(api.jobs.cancel, { jobId })).resolves.toBeNull();
     expect(recorded).toHaveLength(NO_REQUESTS);

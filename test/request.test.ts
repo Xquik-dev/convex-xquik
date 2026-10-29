@@ -1,7 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Operation, Shape } from "#src/component/shape.ts";
 import { rejection, stubFetch } from "./helpers.js";
-import { none } from "#src/component/shape.ts";
 import type { Options } from "#src/component/request.ts";
 import { send } from "#src/component/request.ts";
 
@@ -18,7 +17,7 @@ const PARAMS: Operation["params"] = [
 ];
 
 function thing(response: Operation["response"], result: Shape = "any"): Operation {
-  return { args: {}, body: none, method: "GET", params: PARAMS, path: "/api/v1/things/{id}", response, result };
+  return { args: {}, body: null, method: "GET", params: PARAMS, path: "/api/v1/things/{id}", response, result };
 }
 
 const search = thing("json");
@@ -147,7 +146,7 @@ describe("send reads the answer", () => {
 
   it("returns no events for an empty stream body", { timeout: 5000 }, async () => {
     expect.hasAssertions();
-    stubFetch(() => new Response(none));
+    stubFetch(() => new Response(null));
     await expect(send(thing("events"), { id: "1" }, options)).resolves.toStrictEqual([]);
   });
 

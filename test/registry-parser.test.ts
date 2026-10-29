@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isShape, none, parseRegistry } from "#src/component/shape.ts";
+import { isShape, parseRegistry } from "#src/component/shape.ts";
 
 const NOT_A_SHAPE = 1;
 const MALFORMED = "The operation registry is malformed. Run npm run generate.";
@@ -31,7 +31,7 @@ const REJECTED = [
   {},
   [],
   NOT_A_SHAPE,
-  none,
+  null,
 ];
 
 const GOOD = {
@@ -53,8 +53,8 @@ function changed(name: string, value: unknown): unknown {
 }
 
 const BAD_OPERATIONS = [
-  none,
-  { make: none },
+  null,
+  { make: null },
   { make: GOOD, other: variant("response", "xml") },
   changed("method", NOT_A_SHAPE),
   changed("params", [{ in: "cookie", name: "make", wire: "make" }]),
@@ -68,7 +68,7 @@ const BAD_OPERATIONS = [
   changed("result", "date"),
 ];
 
-const BAD_REGISTRIES = [none, { operations: {} }, { schemas: {} }];
+const BAD_REGISTRIES = [null, { operations: {} }, { schemas: {} }];
 
 describe("the registry parser", () => {
   it("accepts every shape and rejects anything else", { timeout: 10_000 }, () => {

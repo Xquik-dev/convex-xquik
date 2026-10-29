@@ -12,7 +12,7 @@ const xquik = new Xquik(components.xquik);
 
 async function requireUser(ctx: { readonly auth: Readonly<Auth> }): Promise<string> {
   const identity = await ctx.auth.getUserIdentity();
-  if (!identity) {
+  if (identity === null) {
     throw new ConvexError({ error: "unauthenticated", message: "Sign in first.", status: 401 });
   }
   return identity.subject;

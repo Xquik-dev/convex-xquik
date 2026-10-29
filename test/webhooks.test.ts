@@ -1,7 +1,6 @@
 import { api, internal } from "#src/component/_generated/api.ts";
 import { componentTest, delivery, rejection, SECRET, sign, TEST_ALERT } from "./helpers.js";
 import { describe, expect, it, vi } from "vitest";
-import { none } from "#src/component/shape.ts";
 
 const OK = 200;
 const BAD_REQUEST = 400;
@@ -17,7 +16,7 @@ const SCAN = 10;
 const BATCH = 256;
 const EXPIRED_NONCES = 257;
 const OTHER_SECRET = "cd".repeat(SECRET_BYTES);
-const PAGE = { paginationOpts: { cursor: none, numItems: 10 } };
+const PAGE = { paginationOpts: { cursor: null, numItems: 10 } };
 
 type Backend = ReturnType<typeof componentTest>;
 
@@ -61,7 +60,7 @@ describe("the webhook receiver endpoints", () => {
     expect.hasAssertions();
     const { backend, endpointId, url } = await setup();
     const { page: listed } = await backend.query(api.webhooks.list, PAGE);
-    expect(listed).toStrictEqual([{ endpointId, testedAt: none, url, webhookId: none }]);
+    expect(listed).toStrictEqual([{ endpointId, testedAt: null, url, webhookId: null }]);
     expect(url).toMatch(/^https:\/\/happy-otter-123\.convex\.site\/xquik\/webhooks\//u);
     expect(JSON.stringify(listed)).not.toContain(SECRET);
   });
@@ -71,7 +70,7 @@ describe("the webhook receiver endpoints", () => {
     const { backend, endpointId: oldest } = await setup();
     const { endpointId: middle } = await backend.mutation(api.webhooks.add, { secret: SECRET });
     const { endpointId: newest } = await backend.mutation(api.webhooks.add, { secret: SECRET });
-    const first = await backend.query(api.webhooks.list, { paginationOpts: { cursor: none, numItems: 2 } });
+    const first = await backend.query(api.webhooks.list, { paginationOpts: { cursor: null, numItems: 2 } });
     const rest = await backend.query(api.webhooks.list, {
       paginationOpts: { cursor: first.continueCursor, numItems: 2 },
     });
@@ -190,7 +189,7 @@ describe("the webhook receiver handlers", () => {
     const outcome = await withFakeTimers(async () => {
       const backend = componentTest();
       await backend.run(async (ctx) => {
-        await ctx.db.insert("events", { data: none, eventType: "tweet.new", occurredAt: 1, streamEventId: "1" });
+        await ctx.db.insert("events", { data: null, eventType: "tweet.new", occurredAt: 1, streamEventId: "1" });
       });
       const { url: purger } = await backend.mutation(api.webhooks.add, {
         onEvent: "function://;webhooks:purge",
@@ -224,7 +223,7 @@ describe("the webhook receiver edge cases", () => {
     await backend.run(async (ctx) => {
       await ctx.db.delete("endpoints", endpointId);
     });
-    const event = { data: none, eventType: "tweet.new", occurredAt: 1, streamEventId: "1" };
+    const event = { data: null, eventType: "tweet.new", occurredAt: 1, streamEventId: "1" };
     await expect(
       backend.mutation(internal.webhooks.ingest, { delivery: { event, kind: "event" }, endpointId, nonce: "n" }),
     ).resolves.toBe("stored");

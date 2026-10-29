@@ -1,15 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { api } from "#src/component/_generated/api.ts";
 import { componentTest } from "./helpers.js";
-import { none } from "#src/component/shape.ts";
 
 const PAGE_SIZE = 2;
-const PAGE = { cursor: none, numItems: 10 };
+const PAGE = { cursor: null, numItems: 10 };
 const ROWS = [
-  { data: none, eventType: "tweet.new", monitorId: "a", occurredAt: 4, streamEventId: "1" },
-  { data: none, eventType: "tweet.reply", monitorId: "a", occurredAt: 1, streamEventId: "2" },
-  { data: none, eventType: "tweet.new", monitorId: "b", occurredAt: 2, streamEventId: "3" },
-  { data: none, eventType: "tweet.reply", monitorId: "b", occurredAt: 3, streamEventId: "4" },
+  { data: null, eventType: "tweet.new", monitorId: "a", occurredAt: 4, streamEventId: "1" },
+  { data: null, eventType: "tweet.reply", monitorId: "a", occurredAt: 1, streamEventId: "2" },
+  { data: null, eventType: "tweet.new", monitorId: "b", occurredAt: 2, streamEventId: "3" },
+  { data: null, eventType: "tweet.reply", monitorId: "b", occurredAt: 3, streamEventId: "4" },
 ];
 
 async function seeded(): Promise<ReturnType<typeof componentTest>> {
@@ -35,7 +34,7 @@ describe("event queries", () => {
   it("page through events and find one by its stream id", { timeout: 10_000 }, async () => {
     expect.hasAssertions();
     const convex = await seeded();
-    const first = await convex.query(api.events.list, { paginationOpts: { cursor: none, numItems: PAGE_SIZE } });
+    const first = await convex.query(api.events.list, { paginationOpts: { cursor: null, numItems: PAGE_SIZE } });
     expect([first.page.length, first.isDone]).toStrictEqual([PAGE_SIZE, false]);
     await expect(convex.query(api.events.get, { streamEventId: "3" })).resolves.toMatchObject({
       eventType: "tweet.new",

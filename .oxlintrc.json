@@ -1022,5 +1022,38 @@
       }
     ],
     "vitest/warn-todo": "error"
-  }
+  },
+  "overrides": [
+    {
+      "files": [
+        "example/convex/example.ts",
+        "scripts/nodes.ts",
+        "scripts/reader.ts",
+        "src/component/delivery.ts",
+        "src/component/http.ts",
+        "src/component/job.ts",
+        "src/component/jobs.ts",
+        "src/component/registry.ts",
+        "src/component/request.ts",
+        "src/component/shape.ts",
+        "src/component/values.ts",
+        "src/component/webhooks.ts",
+        "test/access.test.ts",
+        "test/coverage.test.ts",
+        "test/events.test.ts",
+        "test/example.test.ts",
+        "test/jobs-rules.test.ts",
+        "test/jobs.test.ts",
+        "test/properties.test.ts",
+        "test/registry-parser.test.ts",
+        "test/registry-shapes.test.ts",
+        "test/registry.test.ts",
+        "test/request-shapes.test.ts",
+        "test/request.test.ts",
+        "test/webhooks-2.test.ts",
+        "test/webhooks.test.ts"
+      ],
+      "rules": { "unicorn/no-null": "off" }
+    }
+  ]
 }

@@ -37,7 +37,7 @@ const enqueue = mutation({
         .query("jobs")
         .withIndex("by_key", (range) => range.eq("key", jobKey).eq("status", "scheduled"))
         .first();
-      if (!existing) {
+      if (existing === null) {
         return await schedule();
       }
       const { _id: existingId, scheduledId } = existing;
@@ -141,7 +141,7 @@ const cancel = mutation({
   handler: async (ctx, { jobId }): Promise<void> => {
     requireApiKey(env.XQUIK_API_KEY);
     const job = await ctx.db.get("jobs", jobId);
-    if (!job) {
+    if (job === null) {
       return;
     }
     if (typeof job.scheduledId !== "string") {

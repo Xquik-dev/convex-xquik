@@ -16,7 +16,7 @@ import {
   without,
 } from "./nodes.ts";
 import type { Field, Operation, Shape } from "#src/component/shape.ts";
-import { isRecord, none } from "#src/component/shape.ts";
+import { isRecord } from "#src/component/shape.ts";
 
 const SCHEMAS = "#/components/schemas/";
 const NO_VARIANTS = 0;
@@ -87,7 +87,7 @@ class Reader {
   private bodyShape(requestBody: Node): Shape | null {
     const media = objectAt(objectAt(requestBody["content"])["application/json"]);
     if (!Object.hasOwn(media, "schema")) {
-      return none;
+      return null;
     }
     return this.deref(this.shape(media["schema"]));
   }

@@ -1,5 +1,5 @@
 import type { Infer, Validator, Value } from "convex/values";
-import { isList, isRecord, none } from "./shape.js";
+import { isList, isRecord } from "./shape.js";
 import { v } from "convex/values";
 
 const json: Validator<Value, "required", string> = v.any();
@@ -24,7 +24,7 @@ function toValue(value: unknown): Value {
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
     return value;
   }
-  return none;
+  return null;
 }
 
 export { eventFields, json, toValue };

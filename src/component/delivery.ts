@@ -56,7 +56,7 @@ async function check(
   if (!TIMESTAMP.test(timestamp) || Math.abs(now - Number(timestamp)) > TOLERANCE_MS) {
     return { ok: false, reason: "stale timestamp" };
   }
-  if (!NONCE.test(nonce) || !signature) {
+  if (!NONCE.test(nonce) || signature === null) {
     return { ok: false, reason: "bad signature" };
   }
   if (await verify(secret, `${timestamp}.${nonce}.`, String(signature[1]), body)) {

@@ -65,14 +65,14 @@ function runsAfter(runs: number, next: Plan): number {
 }
 
 function isScheduled(job: { readonly status: string } | null): job is { readonly status: "scheduled" } {
-  if (!job) {
+  if (job === null) {
     return false;
   }
   return job.status === "scheduled";
 }
 
 function isLive(scheduled: { readonly state: { readonly kind: string } } | null): boolean {
-  if (!scheduled) {
+  if (scheduled === null) {
     return false;
   }
   return LIVE.has(scheduled.state.kind);

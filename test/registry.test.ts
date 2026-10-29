@@ -1,7 +1,7 @@
 import { bodyRegistry, json, post, spec } from "./registry-specs.ts";
 import { describe, expect, it } from "vitest";
 import { eventTypes, operationsModule, readRegistry, registryJson } from "#scripts/registry.ts";
-import { none, parseRegistry } from "#src/component/shape.ts";
+import { parseRegistry } from "#src/component/shape.ts";
 
 interface Generated {
   readonly ids: readonly string[];
@@ -45,7 +45,7 @@ const KEYED_OPERATIONS = {
       limit: { optional: true, shape: { union: ["number", "null"] } },
       pageSize: { optional: true, shape: "number" },
     },
-    body: none,
+    body: null,
     method: "GET",
     params: [
       { in: "path", name: "id", wire: "id" },
@@ -59,7 +59,7 @@ const KEYED_OPERATIONS = {
   },
   open: {
     args: {},
-    body: none,
+    body: null,
     method: "GET",
     params: [],
     path: "/open",
@@ -172,7 +172,7 @@ describe("the generated results", () => {
       { EventType: { enum: ["tweet.new"] }, PostEventType: { enum: ["post.edited", NOT_AN_EVENT] } },
     );
     expect(eventTypes(events)).toStrictEqual(["tweet.new", "post.edited"]);
-    expect(eventTypes(none)).toStrictEqual([]);
+    expect(eventTypes(null)).toStrictEqual([]);
   });
 });
 

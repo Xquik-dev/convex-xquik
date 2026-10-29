@@ -48,7 +48,7 @@ function answer(outcome: string): Response {
 
 const receive = httpAction(async (ctx: Runner, request): Promise<Response> => {
   const endpoint = await ctx.runQuery(internal.webhooks.endpoint, { token: tokenOf(request.url) });
-  if (!endpoint) {
+  if (endpoint === null) {
     return reply(NOT_FOUND, "unknown webhook URL");
   }
   const admission = await admit(endpoint.secret, request.headers, await request.arrayBuffer());
