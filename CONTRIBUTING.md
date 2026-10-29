@@ -11,18 +11,18 @@ bin/check-local
 1. `npm ci` installs the locked dependencies.
 2. `git grep` bans each pattern in `lint/banned-patterns.txt` in every file. The list covers every suppression comment, exclusion key, rule switched off and skipped test. The step also fails on any `.*ignore` file other than `.gitignore`, since lychee and Prettier read those whatever their flags say.
 3. shellcheck lints every shell script with every optional check turned on. It finds each script by its `.sh` or `.bash` name or its shebang.
-4. ast-grep runs the rule in `lint/rules/no-code-comments.yml` over every TypeScript and JavaScript file, after its cases in `lint/rule-tests` pass. A comment stays only with an https link to the page that proves it, an SPDX tag, a `/// <reference` line or a `PURE` or `NO_SIDE_EFFECTS` annotation, or right above such a linked comment.
+4. ast-grep runs `lint/rules/no-code-comments.yml` over every TypeScript and JavaScript file, after the cases in `lint/rule-tests` pass. A comment stays only with an `https` link to the page that proves it, or right above such a linked comment. SPDX tags, `/// <reference` lines and `PURE` or `NO_SIDE_EFFECTS` annotations stay too.
 5. REUSE 6.2.0 checks that every file has a license and a copyright.
 6. gitleaks scans every commit on every ref for secrets, archives included. It reads only its default rules and ignores inline allow comments.
 7. lychee checks every relative link, anchor and code link in the Markdown files offline, with an empty configuration.
 8. Vale checks the prose and spelling of the Markdown files. Any alert fails, suggestions included. `.vale/config/vocabularies/Xquik/accept.txt` lists the words its dictionary lacks.
 9. The Convex CLI generates the component and example code on a local deployment.
-10. `npm run generate` must leave `src/component/registry.json` and `src/component/operations.ts` unchanged. The generator writes both in Prettier's format.
+10. `npm run generate` must leave `src/component/registry.json` and `src/component/operations.ts` unchanged. The generator writes both files in the Prettier format.
 11. Prettier checks the format of every TypeScript, JavaScript, Markdown, JSON and YAML file.
 12. `tsc` checks the types with strict options and `moduleDetection` `force`. It also checks the JavaScript configuration files.
 13. ESLint runs the strict type-checked rules and every Convex rule on every file. ESLint bans `any`, type assertions and non-null assertions. Each public component function calls `requireApiKey` first, so it throws `missing_api_key` until the deployment sets `XQUIK_API_KEY`.
 14. oxlint runs type-aware on every file, with every rule of its 13 plugins at `error`. `import/no-nodejs-modules` keeps Node built-in modules out of every file, so the component, the generator and the tests run on Web APIs alone.
-15. The lint settings step fails when a file runs one of the 11 Convex rules below `error`, or when a rule that oxlint registers for its 13 plugins runs below `error`. `lint/left-out-rules.json` names each exempt rule with the requirement it contradicts.
+15. The lint settings step fails when a file runs one of the 11 Convex rules below `error`. It also fails when oxlint runs a rule of its 13 plugins below `error`, or when a rule name matches the ban list. `lint/left-out-rules.json` names each exempt rule with the reason a failing proof gave.
 16. fallow fails on a function over its complexity limits in `.fallowrc.json`, on any duplicated block, and on an unused file, export or dependency. Convex loads every module in `src/component`, so `.fallowrc.json` names them as entry points.
 17. type-coverage needs every value of every tracked file typed without `any`.
 18. `npm audit` checks the dependencies, and `npm audit signatures` checks their registry signatures.
