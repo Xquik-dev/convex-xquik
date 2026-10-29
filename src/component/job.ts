@@ -36,7 +36,7 @@ type Attempt =
 
 interface Plan {
   readonly status: Infer<typeof jobStatus>;
-  readonly delayMs: number | null;
+  readonly delayMs?: number;
   readonly attempts: number;
 }
 
@@ -52,9 +52,9 @@ function plan(job: { readonly attempts: number; readonly everyMs?: number }, res
     return { attempts: 0, delayMs: job.everyMs, status: "scheduled" };
   }
   if (result.ok) {
-    return { attempts: 0, delayMs: null, status: "succeeded" };
+    return { attempts: 0, status: "succeeded" };
   }
-  return { attempts: 0, delayMs: null, status: "failed" };
+  return { attempts: 0, status: "failed" };
 }
 
 function runsAfter(runs: number, next: Plan): number {
@@ -65,14 +65,17 @@ function runsAfter(runs: number, next: Plan): number {
 }
 
 function isScheduled(job: { readonly status: string } | null): job is { readonly status: "scheduled" } {
-  if (job === null) {
+  if (!job) {
     return false;
   }
   return job.status === "scheduled";
 }
 
 function isLive(scheduled: { readonly state: { readonly kind: string } } | null): boolean {
-  return scheduled !== null && LIVE.has(scheduled.state.kind);
+  if (!scheduled) {
+    return false;
+  }
+  return LIVE.has(scheduled.state.kind);
 }
 
 function requireInterval(everyMs: number | undefined): void {

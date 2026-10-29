@@ -5,6 +5,7 @@ import xquikTest, { register } from "#src/test.ts";
 import type { Auth } from "convex/server";
 import { convexTest } from "convex-test";
 import { createFunctionHandle } from "convex/server";
+import { none } from "#src/component/shape.ts";
 import { requireUser } from "#example/convex/example.ts";
 import schema from "#example/convex/schema.ts";
 import type { TestConvex } from "convex-test";
@@ -16,10 +17,10 @@ const exampleModules = import.meta.glob("#example/convex/**/*.ts");
 const componentFiles = import.meta.glob<Record<string, unknown>>("#src/component/*.ts");
 
 const FUNCTION_FLAGS = ["isQuery", "isMutation", "isAction", "isHttp", "isRouter", "isCrons"];
-const FIRST_PAGE = { cursor: null, numItems: 10 };
+const FIRST_PAGE = { cursor: none, numItems: 10 };
 const unauthenticated = { error: "unauthenticated", message: "Sign in first.", status: 401 };
 const DRAFT = { createdAt: "2026-10-28T19:00:00Z", id: "77", text: "hi", updatedAt: "2026-10-28T19:00:00Z" };
-const BAD_PROFILES = [{ id: "1" }, { id: "1", name: 5, username: "NASA" }, "NASA", null];
+const BAD_PROFILES = [{ id: "1" }, { id: "1", name: 5, username: "NASA" }, "NASA", none];
 const PULLED_EVENT = {
   data: { id: "1" },
   id: "9001",
@@ -73,7 +74,7 @@ describe("the example app's access checks", () => {
     expect.hasAssertions();
     const identity = { issuer: "https://convex.test", subject: "user1", tokenIdentifier: "https://convex.test|user1" };
     const signedIn = vi.fn<Auth["getUserIdentity"]>().mockResolvedValue(identity);
-    const signedOut = vi.fn<Auth["getUserIdentity"]>().mockResolvedValue(null);
+    const signedOut = vi.fn<Auth["getUserIdentity"]>().mockResolvedValue(none);
     await expect(requireUser({ auth: { getUserIdentity: signedIn } })).resolves.toBe("user1");
     await expect(rejection(requireUser({ auth: { getUserIdentity: signedOut } }))).resolves.toStrictEqual(
       unauthenticated,
@@ -162,7 +163,7 @@ describe("the example app's webhooks", () => {
     expect(recorded.map(({ body }): unknown => JSON.parse(body))).toStrictEqual([
       { eventTypes: ["tweet.new", "tweet.reply"], url },
     ]);
-    const event = { data: null, eventType: "tweet.new", occurredAt: 1, streamEventId: "9001" };
+    const event = { data: none, eventType: "tweet.new", occurredAt: 1, streamEventId: "9001" };
     await expect(backend.mutation(internal.example.onEvent, { event })).resolves.toBeNull();
     const rows = await backend.run(async (ctx) => await ctx.db.query("notifications").take(MAX_ROWS));
     expect(rows.map(({ eventType, streamEventId }) => [streamEventId, eventType])).toStrictEqual([

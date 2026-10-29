@@ -206,6 +206,7 @@
     "eslint/no-throw-literal": "error",
     "eslint/no-unassigned-vars": "error",
     "eslint/no-undef": "error",
+    "eslint/no-undefined": "error",
     "eslint/no-underscore-dangle": [
       "error",
       {
@@ -813,6 +814,7 @@
     "unicorn/import-style": "error",
     "unicorn/max-nested-calls": "error",
     "unicorn/new-for-builtins": "error",
+    "unicorn/no-abusive-eslint-disable": "error",
     "unicorn/no-accessor-recursion": "error",
     "unicorn/no-anonymous-default-export": "error",
     "unicorn/no-array-callback-reference": "error",
@@ -842,6 +844,12 @@
     "unicorn/no-nested-ternary": "error",
     "unicorn/no-new-array": "error",
     "unicorn/no-new-buffer": "error",
+    "unicorn/no-null": [
+      "error",
+      {
+        "checkStrictEquality": true
+      }
+    ],
     "unicorn/no-object-as-default-parameter": "error",
     "unicorn/no-process-exit": "error",
     "unicorn/no-single-promise-in-promise-methods": "error",
@@ -968,6 +976,7 @@
     "vitest/padding-around-after-all-blocks": "error",
     "vitest/padding-around-test-blocks": "error",
     "vitest/prefer-called-exactly-once-with": "error",
+    "vitest/prefer-called-once": "error",
     "vitest/prefer-called-times": "error",
     "vitest/prefer-called-with": "error",
     "vitest/prefer-comparison-matcher": "error",
@@ -989,7 +998,9 @@
     "vitest/prefer-strict-boolean-matchers": "error",
     "vitest/prefer-strict-equal": "error",
     "vitest/prefer-to-be": "error",
+    "vitest/prefer-to-be-falsy": "error",
     "vitest/prefer-to-be-object": "error",
+    "vitest/prefer-to-be-truthy": "error",
     "vitest/prefer-to-contain": "error",
     "vitest/prefer-to-have-been-called-times": "error",
     "vitest/prefer-to-have-length": "error",

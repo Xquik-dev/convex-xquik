@@ -7,7 +7,6 @@ import {
   double,
   assert as holds,
   integer,
-  jsonValue,
   nat,
   oneof,
   option,
@@ -20,12 +19,12 @@ import {
 import { componentTest, rejection, sign, stubFetch } from "./helpers.js";
 import { describe, expect, it } from "vitest";
 import type { Field, Shape } from "#src/component/shape.ts";
-import { isList, isRecord } from "#src/component/shape.ts";
 import { matches, registry, schema } from "#src/component/request.ts";
 import type { Arbitrary } from "fast-check";
 import { check as checkSignature } from "#src/component/delivery.ts";
 import { ConvexError } from "convex/values";
 import { makeFunctionReference } from "convex/server";
+import { none } from "#src/component/shape.ts";
 import type { Value } from "convex/values";
 
 type Compound = Exclude<Shape, string | { readonly ref: string } | { readonly literal: unknown }>;
@@ -50,14 +49,13 @@ const encoder = new TextEncoder();
 const secret = string({ minLength: 1, unit: "grapheme" });
 const body = string({ unit: "grapheme" });
 const nonce = stringMatching(/^[0-9a-f]{32}$/u);
-const nothing = jsonValue().filter((item) => typeof item === "object" && !isRecord(item) && !isList(item));
 const key = stringMatching(/^[a-z]{1,8}$/u);
 
 const PRIMITIVES: Readonly<Record<Extract<Shape, string>, Arbitrary<Value>>> = {
   any: string(),
   boolean: boolean(),
   bytes: uint8Array({ maxLength: SMALL }).map((bytes) => Uint8Array.from(bytes).buffer),
-  null: nothing,
+  null: constantFrom(none),
   number: double({ noDefaultInfinity: true, noNaN: true }),
   string: string(),
 };

@@ -123,5 +123,5 @@ async function rejection(promise: Readonly<Promise<unknown>>): Promise<unknown> 
   return await promise.then(() => "resolved", rejectionValue);
 }
 
-export { componentTest, delivery, readSpec, rejection, SECRET, sign, SITE, stubFetch, TEST_ALERT };
+export { componentTest, delivery, readSpec, rejection, SECRET, sign, stubFetch, TEST_ALERT };
 export type { Recorded, Signed };

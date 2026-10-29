@@ -1,6 +1,7 @@
 import { api, internal } from "#src/component/_generated/api.ts";
 import { componentTest, stubFetch } from "./helpers.js";
 import { describe, expect, it, vi } from "vitest";
+import { none } from "#src/component/shape.ts";
 
 const NO_DELAY_MS = 0;
 const NO_REQUESTS = 0;
@@ -8,7 +9,7 @@ const ONE_REQUEST = 1;
 const ALL_ATTEMPTS = 5;
 const THREE_JOBS = 3;
 const FOUR_JOBS = 4;
-const PAGE = { cursor: null, numItems: 10 };
+const PAGE = { cursor: none, numItems: 10 };
 const KEYED = { args: { id: "elonmusk" }, key: "profile", operation: "getUser" };
 const STOPPED = {
   error: { message: "The job stopped before it finished, so this call replaced it." },
@@ -122,7 +123,7 @@ describe("job results", () => {
   it("stores pulled events only from listEvents", { timeout: 10_000 }, async () => {
     expect.hasAssertions();
     const convex = componentTest();
-    const event = { data: null, id: "7", occurredAt: "2026-10-28T19:00:00.000Z", type: "tweet.new" };
+    const event = { data: none, id: "7", occurredAt: "2026-10-28T19:00:00.000Z", type: "tweet.new" };
     const jobId = await faked(async () => {
       const id = await convex.mutation(api.jobs.enqueue, { args: { id: "elonmusk" }, operation: "getUser" });
       await convex.mutation(internal.jobs.finish, { jobId: id, outcome: { ok: true, result: { events: [event] } } });
@@ -175,11 +176,10 @@ describe("idempotency keys", () => {
       return id;
     });
     expect(recorded.map(({ headers }) => headers.get("idempotency-key"))).toStrictEqual([`${jobId}-0`, `${jobId}-0`]);
-    await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({
-      attempts: 0,
-      runs: 1,
-      status: "succeeded",
-    });
+    const settled = await convex.query(api.jobs.get, { jobId });
+    expect(settled).toMatchObject({ attempts: 0, runs: 1, status: "succeeded" });
+    expect(settled).not.toHaveProperty("error");
+    expect(settled).not.toHaveProperty("scheduledId");
   });
 
   it("fills the Idempotency-Key of a write so its retries stay safe", { timeout: 10_000 }, async () => {
@@ -274,6 +274,7 @@ describe("stopped jobs", () => {
     await expect(
       Promise.all([ids.stuck, ids.unscheduled].map(async (jobId) => await convex.query(api.jobs.get, { jobId }))),
     ).resolves.toMatchObject([STOPPED, STOPPED]);
+    await expect(convex.query(api.jobs.get, { jobId: ids.stuck })).resolves.not.toHaveProperty("scheduledId");
   });
 });
 
@@ -291,7 +292,7 @@ describe("deleted jobs", () => {
     const recorded = stubFetch(() => Response.json({}));
     await expect(convex.action(internal.jobs.run, { jobId })).resolves.toBeNull();
     await expect(
-      convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: null } }),
+      convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: none } }),
     ).resolves.toBeNull();
     await expect(convex.mutation(api.jobs.cancel, { jobId })).resolves.toBeNull();
     expect(recorded).toHaveLength(NO_REQUESTS);

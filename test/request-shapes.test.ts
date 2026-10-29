@@ -2,6 +2,7 @@ import { argument, events, find, matches, parse, project, schema, validator } fr
 import { ConvexError, v } from "convex/values";
 import { describe, expect, it } from "vitest";
 import type { Field, Shape } from "#src/component/shape.ts";
+import { none } from "#src/component/shape.ts";
 import { toValue } from "#src/component/values.ts";
 
 const post: Shape = {
@@ -12,7 +13,7 @@ const post: Shape = {
 };
 
 const cases: { readonly bad: unknown; readonly good: unknown; readonly shape: Shape }[] = [
-  { bad: 0, good: null, shape: "null" },
+  { bad: 0, good: none, shape: "null" },
   { bad: [true], good: new Uint8Array().buffer, shape: "bytes" },
   { bad: 1, good: "a", shape: "string" },
   { bad: "1", good: 1, shape: "number" },
@@ -25,7 +26,7 @@ const cases: { readonly bad: unknown; readonly good: unknown; readonly shape: Sh
   { bad: { kind: "post" }, good: { id: "1" }, shape: post },
   { bad: { id: 1 }, good: { id: "1", kind: "post" }, shape: post },
   { bad: "1", good: { id: "1" }, shape: post },
-  { bad: 1, good: null, shape: { union: ["string", "null"] } },
+  { bad: 1, good: none, shape: { union: ["string", "null"] } },
   { bad: 1, good: "abc", shape: { ref: "NextCursor" } },
 ];
 
@@ -40,11 +41,13 @@ describe("parsing", () => {
 
   it("toValue keeps JSON values and turns anything else into null", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    expect(toValue({ count: 1, list: ["b", true, null, undefined], run: () => "ignored" })).toStrictEqual({
-      count: 1,
-      list: ["b", true, null, null],
-      run: null,
-    });
+    expect(toValue({ count: 1, list: ["b", true, none, (): string => "ignored"], run: () => "ignored" })).toStrictEqual(
+      {
+        count: 1,
+        list: ["b", true, none, none],
+        run: none,
+      },
+    );
     expect(parse('{"outer":[{"count":1},{"inner":"z"}]}')).toStrictEqual({ outer: [{ count: 1 }, { inner: "z" }] });
   });
 
@@ -107,7 +110,7 @@ describe(project, () => {
       id: "1",
       name: "Mars",
     });
-    expect(project("any", { list: ["b", undefined] })).toStrictEqual({ list: ["b", null] });
+    expect(project("any", { list: ["b", (): string => "ignored"] })).toStrictEqual({ list: ["b", none] });
     expect(project({ literal: "post" }, "post")).toBe("post");
   });
 
@@ -134,7 +137,7 @@ describe(project, () => {
     expect(project({ array: "string" }, { alpha: 1 })).toStrictEqual({ alpha: 1 });
     expect(project({ record: "string" }, ["b"])).toStrictEqual(["b"]);
     expect(project(post, ["b"])).toStrictEqual(["b"]);
-    expect(project("string", undefined)).toBeNull();
+    expect(project("string", () => "ignored")).toBeNull();
   });
 });
 
@@ -150,6 +153,11 @@ describe(matches, () => {
 
   it("accepts anything for any", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    expect(matches("any", undefined)).toBe(true);
+    expect(["text", true, none, (): string => "ignored"].map((value) => matches("any", value))).toStrictEqual([
+      true,
+      true,
+      true,
+      true,
+    ]);
   });
 });

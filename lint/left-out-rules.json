@@ -1,29 +1,16 @@
 {
   "import/no-default-export": {
-    "reason": "Convex needs the default export of convex.config.ts, schema.ts, http.ts and crons.ts."
+    "reason": "Convex codegen fails unless convex.config.ts has a default export."
   },
   "import/no-named-export": {
-    "reason": "Convex names each registered function after its named export."
-  },
-  "no-undefined": {
-    "reason": "Convex removes a field from a document only when patch passes it undefined."
+    "reason": "Convex names each function after its export, so a default export renames events.list."
   },
   "oxc/no-async-await": {
-    "reason": "typescript/promise-function-async"
-  },
-  "unicorn/no-null": {
-    "reason": "Convex has no undefined value, so the schema and the returns validators hold null."
+    "reason": "A mutation must await what it reads, and the then and plain Promise forms fail other rules.",
+    "clashes": ["promise/prefer-await-to-then", "typescript/promise-function-async"]
   },
   "vitest/no-importing-vitest-globals": {
-    "reason": "vitest/prefer-importing-vitest-globals"
-  },
-  "vitest/prefer-called-once": {
-    "reason": "vitest/prefer-called-times"
-  },
-  "vitest/prefer-to-be-falsy": {
-    "reason": "vitest/prefer-strict-boolean-matchers"
-  },
-  "vitest/prefer-to-be-truthy": {
-    "reason": "vitest/prefer-strict-boolean-matchers"
+    "reason": "An alias such as it as check hides each test from require-hook and expect-expect.",
+    "clashes": ["vitest/prefer-importing-vitest-globals"]
   }
 }

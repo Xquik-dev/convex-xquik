@@ -2,7 +2,7 @@ import { componentTest, delivery, readSpec, SECRET, sign, stubFetch, TEST_ALERT 
 import { describe, expect, it } from "vitest";
 import type { Field, Shape } from "#src/component/shape.ts";
 import { find, schema } from "#src/component/request.ts";
-import { isList, isRecord } from "#src/component/shape.ts";
+import { isList, isRecord, none } from "#src/component/shape.ts";
 import { api } from "#src/component/_generated/api.ts";
 import { makeFunctionReference } from "convex/server";
 import type { Value } from "convex/values";
@@ -16,16 +16,16 @@ const SAMPLES: Readonly<Record<string, unknown>> = {
   array: [],
   boolean: true,
   integer: 1,
-  null: null,
+  null: none,
   number: 1,
   string: "NASA",
 };
 
 const PRIMITIVE_SAMPLES: Readonly<Record<Extract<Shape, string>, Value>> = {
-  any: null,
+  any: none,
   boolean: true,
-  bytes: null,
-  null: null,
+  bytes: none,
+  null: none,
   number: 1,
   string: "elonmusk",
 };
@@ -197,7 +197,7 @@ function answer(id: string, responses: unknown): Expected {
     return { response, result: [{ data: { id: "1" }, event: "tweet.new", id: "1" }] };
   }
   if (kind === "none") {
-    return { response: new Response(null, { status: 202 }), result: null };
+    return { response: new Response(none, { status: 202 }), result: none };
   }
   const result = documented(responses);
   return { response: Response.json(result), result };
