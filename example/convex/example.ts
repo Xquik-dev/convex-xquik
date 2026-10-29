@@ -1,71 +1,79 @@
-import { paginationOptsValidator, paginationResultValidator, type Auth, type PaginationResult } from "convex/server";
-import { ConvexError, v } from "convex/values";
-import { eventDoc, eventFields, Xquik, type EventDoc } from "xquik-convex";
+import type { Auth, PaginationResult } from "convex/server";
 import { components, internal } from "./_generated/api.js";
+import { ConvexError, v } from "convex/values";
+import { eventDoc, eventFields, Xquik } from "xquik-convex";
 import { internalAction, internalMutation, query } from "./_generated/server.js";
+import { paginationOptsValidator, paginationResultValidator } from "convex/server";
+import type { EventDoc } from "xquik-convex";
+
+const PULL_EVERY_MS = 300_000;
 
 const xquik = new Xquik(components.xquik);
 
-export async function requireUser(ctx: { readonly auth: Auth }): Promise<string> {
+async function requireUser(ctx: { readonly auth: Readonly<Auth> }): Promise<string> {
   const identity = await ctx.auth.getUserIdentity();
-  if (identity === null) throw new ConvexError({ status: 401, error: "unauthenticated", message: "Sign in first." });
+  if (identity === null) {
+    throw new ConvexError({ error: "unauthenticated", message: "Sign in first.", status: 401 });
+  }
   return identity.subject;
 }
 
-export const profile = internalAction({
+const profile = internalAction({
   args: { username: v.string() },
-  returns: v.object({ name: v.string(), followers: v.number() }),
   handler: async (ctx, { username }) => {
     const user = await ctx.runAction(components.xquik.operations.getUser, { id: username });
-    if (user.followers === undefined) {
+    if (typeof user.followers !== "number") {
       throw new ConvexError({
-        status: 502,
         error: "no_follower_count",
         message: `X sent no follower count for ${username}.`,
+        status: 502,
       });
     }
-    return { name: user.name, followers: user.followers };
+    return { followers: user.followers, name: user.name };
   },
+  returns: v.object({ followers: v.number(), name: v.string() }),
 });
 
-export const draft = internalAction({
+const draft = internalAction({
   args: { text: v.string() },
-  returns: v.string(),
   handler: async (ctx, { text }) => {
     const created = await ctx.runAction(components.xquik.operations.createDraft, { text });
     await ctx.runAction(components.xquik.operations.deleteDraft, { id: created.id });
     return created.id;
   },
+  returns: v.string(),
 });
 
-export const watch = internalAction({
+const watch = internalAction({
   args: {},
-  returns: v.object({ endpointId: v.string(), url: v.string(), webhookId: v.string() }),
   handler: async (ctx): Promise<{ endpointId: string; url: string; webhookId: string }> =>
     await xquik.createWebhook(ctx, { eventTypes: ["tweet.new", "tweet.reply"], onEvent: internal.example.onEvent }),
+  returns: v.object({ endpointId: v.string(), url: v.string(), webhookId: v.string() }),
 });
 
-export const onEvent = internalMutation({
+const onEvent = internalMutation({
   args: { event: eventFields },
-  returns: v.null(),
   handler: async (ctx, { event }) => {
-    await ctx.db.insert("notifications", { streamEventId: event.streamEventId, eventType: event.eventType });
+    await ctx.db.insert("notifications", { eventType: event.eventType, streamEventId: event.streamEventId });
     return null;
   },
+  returns: v.null(),
 });
 
-export const pull = internalMutation({
+const pull = internalMutation({
   args: {},
-  returns: v.string(),
   handler: async (ctx) =>
-    await xquik.schedule(ctx, "listEvents", { limit: 100 }, { key: "events", everyMs: 5 * 60 * 1000 }),
+    await xquik.schedule(ctx, "listEvents", { limit: 100 }, { everyMs: PULL_EVERY_MS, key: "events" }),
+  returns: v.string(),
 });
 
-export const events = query({
+const events = query({
   args: { paginationOpts: paginationOptsValidator },
-  returns: paginationResultValidator(eventDoc),
   handler: async (ctx, { paginationOpts }): Promise<PaginationResult<EventDoc>> => {
     await requireUser(ctx);
     return await ctx.runQuery(components.xquik.events.list, { paginationOpts });
   },
+  returns: paginationResultValidator(eventDoc),
 });
+
+export { draft, events, onEvent, profile, pull, requireUser, watch };

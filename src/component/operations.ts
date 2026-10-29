@@ -1,192 +1,194 @@
-import { operation } from "./operation.js";
+import { operations } from "./operation.js";
 
-export const addTicketMessage = operation("addTicketMessage");
-export const analyzeBrandMentions = operation("analyzeBrandMentions");
-export const analyzeMarketSignals = operation("analyzeMarketSignals");
-export const analyzeNewsPosts = operation("analyzeNewsPosts");
-export const analyzeStyle = operation("analyzeStyle");
-export const analyzeTweetSentiment = operation("analyzeTweetSentiment");
-export const analyzeTweetViralScore = operation("analyzeTweetViralScore");
-export const autocompleteSearch = operation("autocompleteSearch");
-export const cancelExtraction = operation("cancelExtraction");
-export const checkFollow = operation("checkFollow");
-export const classifyTweets = operation("classifyTweets");
-export const compareStyles = operation("compareStyles");
-export const compose = operation("compose");
-export const createCommunity = operation("createCommunity");
-export const createDraft = operation("createDraft");
-export const createDraw = operation("createDraw");
-export const createExtraction = operation("createExtraction");
-export const createGuestWallet = operation("createGuestWallet");
-export const createKeywordMonitor = operation("createKeywordMonitor");
-export const createMonitor = operation("createMonitor");
-export const createPostMonitor = operation("createPostMonitor");
-export const createTelegramLink = operation("createTelegramLink");
-export const createTicket = operation("createTicket");
-export const createTweet = operation("createTweet");
-export const createWebhook = operation("createWebhook");
-export const deleteCommunity = operation("deleteCommunity");
-export const deleteDm = operation("deleteDm");
-export const deleteDraft = operation("deleteDraft");
-export const deleteKeywordMonitor = operation("deleteKeywordMonitor");
-export const deleteMonitor = operation("deleteMonitor");
-export const deletePostMonitor = operation("deletePostMonitor");
-export const deleteStyle = operation("deleteStyle");
-export const deleteTweet = operation("deleteTweet");
-export const deleteWebhook = operation("deleteWebhook");
-export const downloadMedia = operation("downloadMedia");
-export const downloadSupportAttachment = operation("downloadSupportAttachment");
-export const estimateExtraction = operation("estimateExtraction");
-export const exportDraw = operation("exportDraw");
-export const exportExtraction = operation("exportExtraction");
-export const findCommunities = operation("findCommunities");
-export const followUser = operation("followUser");
-export const getAccount = operation("getAccount");
-export const getAllCommunityTweets = operation("getAllCommunityTweets");
-export const getArticle = operation("getArticle");
-export const getBatchTweets = operation("getBatchTweets");
-export const getBatchUsers = operation("getBatchUsers");
-export const getBatchUserTweets = operation("getBatchUserTweets");
-export const getBookmarkFolders = operation("getBookmarkFolders");
-export const getBookmarks = operation("getBookmarks");
-export const getBroadcast = operation("getBroadcast");
-export const getCommunityAnalytics = operation("getCommunityAnalytics");
-export const getCommunityInfo = operation("getCommunityInfo");
-export const getCommunityMedia = operation("getCommunityMedia");
-export const getCommunityMembers = operation("getCommunityMembers");
-export const getCommunityModerators = operation("getCommunityModerators");
-export const getCommunityNotesContributor = operation("getCommunityNotesContributor");
-export const getCommunityTopics = operation("getCommunityTopics");
-export const getCommunityTweets = operation("getCommunityTweets");
-export const getCredits = operation("getCredits");
-export const getCreditTopupStatus = operation("getCreditTopupStatus");
-export const getDmHistory = operation("getDmHistory");
-export const getDraft = operation("getDraft");
-export const getDraw = operation("getDraw");
-export const getEvent = operation("getEvent");
-export const getExtraction = operation("getExtraction");
-export const getFollowersYouKnow = operation("getFollowersYouKnow");
-export const getFootballBoxScore = operation("getFootballBoxScore");
-export const getFootballPlayerProps = operation("getFootballPlayerProps");
-export const getFootballPlays = operation("getFootballPlays");
-export const getFootballRoster = operation("getFootballRoster");
-export const getFootballScoreboard = operation("getFootballScoreboard");
-export const getGuestWalletStatus = operation("getGuestWalletStatus");
-export const getJob = operation("getJob");
-export const getJobLocations = operation("getJobLocations");
-export const getKeywordMonitor = operation("getKeywordMonitor");
-export const getList = operation("getList");
-export const getListFollowers = operation("getListFollowers");
-export const getListMembers = operation("getListMembers");
-export const getListTweets = operation("getListTweets");
-export const getMonitor = operation("getMonitor");
-export const getNotifications = operation("getNotifications");
-export const getPopularCommunities = operation("getPopularCommunities");
-export const getPostMonitor = operation("getPostMonitor");
-export const getPostMonitorMetrics = operation("getPostMonitorMetrics");
-export const getRadar = operation("getRadar");
-export const getSimilarUsers = operation("getSimilarUsers");
-export const getSpace = operation("getSpace");
-export const getSpaceReplay = operation("getSpaceReplay");
-export const getSportsGameAudience = operation("getSportsGameAudience");
-export const getSportsGamePosts = operation("getSportsGamePosts");
-export const getStyle = operation("getStyle");
-export const getStylePerformance = operation("getStylePerformance");
-export const getSuggestedCommunities = operation("getSuggestedCommunities");
-export const getTicket = operation("getTicket");
-export const getTimeline = operation("getTimeline");
-export const getTopTweets = operation("getTopTweets");
-export const getTrends = operation("getTrends");
-export const getTweetEmbed = operation("getTweetEmbed");
-export const getTweetFavoriters = operation("getTweetFavoriters");
-export const getTweetHiddenReplies = operation("getTweetHiddenReplies");
-export const getTweetInsights = operation("getTweetInsights");
-export const getTweetQuotes = operation("getTweetQuotes");
-export const getTweetReplies = operation("getTweetReplies");
-export const getTweetRepostCheck = operation("getTweetRepostCheck");
-export const getTweetRetweeterIds = operation("getTweetRetweeterIds");
-export const getTweetRetweeters = operation("getTweetRetweeters");
-export const getTweetSubtitles = operation("getTweetSubtitles");
-export const getTweetThread = operation("getTweetThread");
-export const getUser = operation("getUser");
-export const getUserAffiliates = operation("getUserAffiliates");
-export const getUserArticles = operation("getUserArticles");
-export const getUserFollowerIds = operation("getUserFollowerIds");
-export const getUserFollowers = operation("getUserFollowers");
-export const getUserFollowing = operation("getUserFollowing");
-export const getUserFollowingIds = operation("getUserFollowingIds");
-export const getUserHighlights = operation("getUserHighlights");
-export const getUserInsights = operation("getUserInsights");
-export const getUserLikes = operation("getUserLikes");
-export const getUserListMemberships = operation("getUserListMemberships");
-export const getUserLists = operation("getUserLists");
-export const getUserLiveStatus = operation("getUserLiveStatus");
-export const getUserMedia = operation("getUserMedia");
-export const getUserMentions = operation("getUserMentions");
-export const getUserReplies = operation("getUserReplies");
-export const getUserSubscriptions = operation("getUserSubscriptions");
-export const getUserTweets = operation("getUserTweets");
-export const getUserVerifiedFollowers = operation("getUserVerifiedFollowers");
-export const getWriteActionStatus = operation("getWriteActionStatus");
-export const getXAccount = operation("getXAccount");
-export const getXHashflags = operation("getXHashflags");
-export const getXNewsStoryVersions = operation("getXNewsStoryVersions");
-export const getXTrendLocations = operation("getXTrendLocations");
-export const getXTrends = operation("getXTrends");
-export const getXTrendsHistory = operation("getXTrendsHistory");
-export const joinCommunity = operation("joinCommunity");
-export const leaveCommunity = operation("leaveCommunity");
-export const likeTweet = operation("likeTweet");
-export const listCommunityNotesContributorDeletedNotes = operation("listCommunityNotesContributorDeletedNotes");
-export const listCommunityNotesContributorNotes = operation("listCommunityNotesContributorNotes");
-export const listDrafts = operation("listDrafts");
-export const listDraws = operation("listDraws");
-export const listEvents = operation("listEvents");
-export const listExtractions = operation("listExtractions");
-export const listFootballGames = operation("listFootballGames");
-export const listKeywordMonitors = operation("listKeywordMonitors");
-export const listMonitors = operation("listMonitors");
-export const listPostMonitors = operation("listPostMonitors");
-export const listStyles = operation("listStyles");
-export const listTickets = operation("listTickets");
-export const listWebhookDeliveries = operation("listWebhookDeliveries");
-export const listWebhooks = operation("listWebhooks");
-export const listXAccounts = operation("listXAccounts");
-export const lookupTweet = operation("lookupTweet");
-export const removeFollower = operation("removeFollower");
-export const resolveLinks = operation("resolveLinks");
-export const resumeWebhook = operation("resumeWebhook");
-export const retweet = operation("retweet");
-export const saveStyle = operation("saveStyle");
-export const searchCommunities = operation("searchCommunities");
-export const searchCommunityMembers = operation("searchCommunityMembers");
-export const searchJobs = operation("searchJobs");
-export const searchLists = operation("searchLists");
-export const searchSpaces = operation("searchSpaces");
-export const searchTweets = operation("searchTweets");
-export const searchUsers = operation("searchUsers");
-export const searchXPlaces = operation("searchXPlaces");
-export const searchXquikDocumentation = operation("searchXquikDocumentation");
-export const searchXquikDocumentationWithQuery = operation("searchXquikDocumentationWithQuery");
-export const sendDm = operation("sendDm");
-export const setXIdentity = operation("setXIdentity");
-export const streamEvents = operation("streamEvents");
-export const subscribe = operation("subscribe");
-export const testWebhook = operation("testWebhook");
-export const topUpCredits = operation("topUpCredits");
-export const topUpGuestWallet = operation("topUpGuestWallet");
-export const translateTweet = operation("translateTweet");
-export const translateUserBio = operation("translateUserBio");
-export const unfollowUser = operation("unfollowUser");
-export const unlikeTweet = operation("unlikeTweet");
-export const unretweet = operation("unretweet");
-export const updateAccount = operation("updateAccount");
-export const updateAvatar = operation("updateAvatar");
-export const updateBanner = operation("updateBanner");
-export const updateKeywordMonitor = operation("updateKeywordMonitor");
-export const updateMonitor = operation("updateMonitor");
-export const updatePostMonitor = operation("updatePostMonitor");
-export const updateProfile = operation("updateProfile");
-export const updateTicketStatus = operation("updateTicketStatus");
-export const updateWebhook = operation("updateWebhook");
-export const uploadMedia = operation("uploadMedia");
+export const {
+  addTicketMessage,
+  analyzeBrandMentions,
+  analyzeMarketSignals,
+  analyzeNewsPosts,
+  analyzeStyle,
+  analyzeTweetSentiment,
+  analyzeTweetViralScore,
+  autocompleteSearch,
+  cancelExtraction,
+  checkFollow,
+  classifyTweets,
+  compareStyles,
+  compose,
+  createCommunity,
+  createDraft,
+  createDraw,
+  createExtraction,
+  createGuestWallet,
+  createKeywordMonitor,
+  createMonitor,
+  createPostMonitor,
+  createTelegramLink,
+  createTicket,
+  createTweet,
+  createWebhook,
+  deleteCommunity,
+  deleteDm,
+  deleteDraft,
+  deleteKeywordMonitor,
+  deleteMonitor,
+  deletePostMonitor,
+  deleteStyle,
+  deleteTweet,
+  deleteWebhook,
+  downloadMedia,
+  downloadSupportAttachment,
+  estimateExtraction,
+  exportDraw,
+  exportExtraction,
+  findCommunities,
+  followUser,
+  getAccount,
+  getAllCommunityTweets,
+  getArticle,
+  getBatchTweets,
+  getBatchUsers,
+  getBatchUserTweets,
+  getBookmarkFolders,
+  getBookmarks,
+  getBroadcast,
+  getCommunityAnalytics,
+  getCommunityInfo,
+  getCommunityMedia,
+  getCommunityMembers,
+  getCommunityModerators,
+  getCommunityNotesContributor,
+  getCommunityTopics,
+  getCommunityTweets,
+  getCredits,
+  getCreditTopupStatus,
+  getDmHistory,
+  getDraft,
+  getDraw,
+  getEvent,
+  getExtraction,
+  getFollowersYouKnow,
+  getFootballBoxScore,
+  getFootballPlayerProps,
+  getFootballPlays,
+  getFootballRoster,
+  getFootballScoreboard,
+  getGuestWalletStatus,
+  getJob,
+  getJobLocations,
+  getKeywordMonitor,
+  getList,
+  getListFollowers,
+  getListMembers,
+  getListTweets,
+  getMonitor,
+  getNotifications,
+  getPopularCommunities,
+  getPostMonitor,
+  getPostMonitorMetrics,
+  getRadar,
+  getSimilarUsers,
+  getSpace,
+  getSpaceReplay,
+  getSportsGameAudience,
+  getSportsGamePosts,
+  getStyle,
+  getStylePerformance,
+  getSuggestedCommunities,
+  getTicket,
+  getTimeline,
+  getTopTweets,
+  getTrends,
+  getTweetEmbed,
+  getTweetFavoriters,
+  getTweetHiddenReplies,
+  getTweetInsights,
+  getTweetQuotes,
+  getTweetReplies,
+  getTweetRepostCheck,
+  getTweetRetweeterIds,
+  getTweetRetweeters,
+  getTweetSubtitles,
+  getTweetThread,
+  getUser,
+  getUserAffiliates,
+  getUserArticles,
+  getUserFollowerIds,
+  getUserFollowers,
+  getUserFollowing,
+  getUserFollowingIds,
+  getUserHighlights,
+  getUserInsights,
+  getUserLikes,
+  getUserListMemberships,
+  getUserLists,
+  getUserLiveStatus,
+  getUserMedia,
+  getUserMentions,
+  getUserReplies,
+  getUserSubscriptions,
+  getUserTweets,
+  getUserVerifiedFollowers,
+  getWriteActionStatus,
+  getXAccount,
+  getXHashflags,
+  getXNewsStoryVersions,
+  getXTrendLocations,
+  getXTrends,
+  getXTrendsHistory,
+  joinCommunity,
+  leaveCommunity,
+  likeTweet,
+  listCommunityNotesContributorDeletedNotes,
+  listCommunityNotesContributorNotes,
+  listDrafts,
+  listDraws,
+  listEvents,
+  listExtractions,
+  listFootballGames,
+  listKeywordMonitors,
+  listMonitors,
+  listPostMonitors,
+  listStyles,
+  listTickets,
+  listWebhookDeliveries,
+  listWebhooks,
+  listXAccounts,
+  lookupTweet,
+  removeFollower,
+  resolveLinks,
+  resumeWebhook,
+  retweet,
+  saveStyle,
+  searchCommunities,
+  searchCommunityMembers,
+  searchJobs,
+  searchLists,
+  searchSpaces,
+  searchTweets,
+  searchUsers,
+  searchXPlaces,
+  searchXquikDocumentation,
+  searchXquikDocumentationWithQuery,
+  sendDm,
+  setXIdentity,
+  streamEvents,
+  subscribe,
+  testWebhook,
+  topUpCredits,
+  topUpGuestWallet,
+  translateTweet,
+  translateUserBio,
+  unfollowUser,
+  unlikeTweet,
+  unretweet,
+  updateAccount,
+  updateAvatar,
+  updateBanner,
+  updateKeywordMonitor,
+  updateMonitor,
+  updatePostMonitor,
+  updateProfile,
+  updateTicketStatus,
+  updateWebhook,
+  uploadMedia,
+} = operations();

@@ -1,31 +1,73 @@
-import { httpRouter } from "convex/server";
-import { internal } from "./_generated/api.js";
-import { httpAction, type ActionCtx } from "./_generated/server.js";
 import { check, readDelivery } from "./delivery.js";
+import type { ActionCtx } from "./_generated/server.js";
+import type { EventFields } from "./values.js";
+import { httpAction } from "./_generated/server.js";
+import { httpRouter } from "convex/server";
+import type { HttpRouter } from "convex/server";
+import { internal } from "./_generated/api.js";
+
+const OK = 200;
+const BAD_REQUEST = 400;
+const UNAUTHORIZED = 401;
+const NOT_FOUND = 404;
+const SLASH = "/";
+
+type Runner = Readonly<Pick<ActionCtx, "runMutation" | "runQuery">>;
+
+type Admission =
+  | { readonly ok: true; readonly event: EventFields | null; readonly nonce: string }
+  | { readonly ok: false; readonly reason: string; readonly status: number };
 
 function reply(status: number, text: string): Response {
-  return new Response(text, { status, headers: { "content-type": "text/plain" } });
+  return new Response(text, { headers: { "content-type": "text/plain" }, status });
 }
 
-export const receive = httpAction(async (ctx: ActionCtx, request: Request): Promise<Response> => {
-  const path = new URL(request.url).pathname;
-  const endpoint = await ctx.runQuery(internal.webhooks.endpoint, { token: path.slice(path.lastIndexOf("/") + 1) });
-  if (endpoint === null) return reply(404, "unknown webhook URL");
-  const body = await request.arrayBuffer();
-  const verdict = await check(endpoint.secret, request.headers, body, Date.now());
-  if (!verdict.ok) return reply(401, verdict.reason);
+function tokenOf(url: string): string {
+  const { pathname } = new URL(url);
+  return pathname.slice(pathname.lastIndexOf(SLASH) + SLASH.length);
+}
+
+async function admit(secret: string, headers: Readonly<Headers>, body: Readonly<ArrayBuffer>): Promise<Admission> {
+  const verdict = await check(secret, headers, body, Date.now());
+  if (!verdict.ok) {
+    return { ok: false, reason: verdict.reason, status: UNAUTHORIZED };
+  }
   const delivery = readDelivery(new TextDecoder().decode(body));
-  if (delivery === null) return reply(400, "not an Xquik delivery");
-  const outcome = await ctx.runMutation(internal.webhooks.ingest, {
-    endpointId: endpoint._id,
-    nonce: verdict.nonce,
-    event: delivery.kind === "test" ? null : delivery.event,
-  });
-  return outcome === "replay" ? reply(401, "replayed nonce") : reply(200, outcome);
+  if (delivery === null) {
+    return { ok: false, reason: "not an Xquik delivery", status: BAD_REQUEST };
+  }
+  if (delivery.kind === "test") {
+    return { event: null, nonce: verdict.nonce, ok: true };
+  }
+  return { event: delivery.event, nonce: verdict.nonce, ok: true };
+}
+
+function answer(outcome: string): Response {
+  if (outcome === "replay") {
+    return reply(UNAUTHORIZED, "replayed nonce");
+  }
+  return reply(OK, outcome);
+}
+
+const receive = httpAction(async (ctx: Runner, request): Promise<Response> => {
+  const endpoint = await ctx.runQuery(internal.webhooks.endpoint, { token: tokenOf(request.url) });
+  if (endpoint === null) {
+    return reply(NOT_FOUND, "unknown webhook URL");
+  }
+  const admission = await admit(endpoint.secret, request.headers, await request.arrayBuffer());
+  if (!admission.ok) {
+    return reply(admission.status, admission.reason);
+  }
+  const { _id: endpointId } = endpoint;
+  const { event, nonce } = admission;
+  return answer(await ctx.runMutation(internal.webhooks.ingest, { endpointId, event, nonce }));
 });
 
-const http = httpRouter();
+function router(): HttpRouter {
+  const http = httpRouter();
+  http.route({ handler: receive, method: "POST", pathPrefix: "/webhooks/" });
+  return http;
+}
 
-http.route({ pathPrefix: "/webhooks/", method: "POST", handler: receive });
-
-export default http;
+export { receive };
+export default router();

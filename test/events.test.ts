@@ -1,40 +1,44 @@
-import { describe, expect, test } from "vitest";
-import { api } from "../src/component/_generated/api.js";
+import { describe, expect, it } from "vitest";
+import { api } from "#src/component/_generated/api.ts";
 import { componentTest } from "./helpers.js";
 
+const PAGE_SIZE = 2;
+const PAGE = { cursor: null, numItems: 10 };
+const ROWS = [
+  { data: null, eventType: "tweet.new", monitorId: "a", occurredAt: 4, streamEventId: "1" },
+  { data: null, eventType: "tweet.reply", monitorId: "a", occurredAt: 1, streamEventId: "2" },
+  { data: null, eventType: "tweet.new", monitorId: "b", occurredAt: 2, streamEventId: "3" },
+  { data: null, eventType: "tweet.reply", monitorId: "b", occurredAt: 3, streamEventId: "4" },
+];
+
+async function seeded(): Promise<ReturnType<typeof componentTest>> {
+  const convex = componentTest();
+  await convex.run(async (ctx) => {
+    await Promise.all(ROWS.map(async (row) => await ctx.db.insert("events", row)));
+  });
+  return convex;
+}
+
 describe("event queries", () => {
-  test("list newest first, filtered by type or monitor, one page at a time", async () => {
-    const t = componentTest();
-    await t.run(async (ctx) => {
-      const rows = [
-        ["1", "tweet.new", "a", 4],
-        ["2", "tweet.reply", "a", 1],
-        ["3", "tweet.new", "b", 2],
-        ["4", "tweet.reply", "b", 3],
-      ] as const;
-      for (const [id, type, monitor, at] of rows) {
-        await ctx.db.insert("events", {
-          streamEventId: id,
-          eventType: type,
-          monitorId: monitor,
-          occurredAt: at,
-          data: null,
-        });
-      }
+  it("list newest first, filtered by type or monitor", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = await seeded();
+    const all = await convex.query(api.events.list, { paginationOpts: PAGE });
+    const typed = await convex.query(api.events.list, { filter: { eventType: "tweet.new" }, paginationOpts: PAGE });
+    const monitored = await convex.query(api.events.list, { filter: { monitorId: "a" }, paginationOpts: PAGE });
+    expect(all.page.map((event) => event.streamEventId)).toStrictEqual(["1", "4", "3", "2"]);
+    expect(typed.page.map((event) => event.streamEventId)).toStrictEqual(["1", "3"]);
+    expect(monitored.page.map((event) => event.streamEventId)).toStrictEqual(["1", "2"]);
+  });
+
+  it("page through events and find one by its stream id", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = await seeded();
+    const first = await convex.query(api.events.list, { paginationOpts: { cursor: null, numItems: PAGE_SIZE } });
+    expect([first.page.length, first.isDone]).toStrictEqual([PAGE_SIZE, false]);
+    await expect(convex.query(api.events.get, { streamEventId: "3" })).resolves.toMatchObject({
+      eventType: "tweet.new",
     });
-    const ids = async (filter?: { eventType: string } | { monitorId: string }): Promise<string[]> => {
-      const page = await t.query(api.events.list, {
-        paginationOpts: { numItems: 10, cursor: null },
-        ...(filter === undefined ? {} : { filter }),
-      });
-      return page.page.map((event) => event.streamEventId);
-    };
-    expect(await ids()).toEqual(["1", "4", "3", "2"]);
-    expect(await ids({ eventType: "tweet.new" })).toEqual(["1", "3"]);
-    expect(await ids({ monitorId: "a" })).toEqual(["1", "2"]);
-    const first = await t.query(api.events.list, { paginationOpts: { numItems: 2, cursor: null } });
-    expect([first.page.length, first.isDone]).toEqual([2, false]);
-    expect(await t.query(api.events.get, { streamEventId: "3" })).toMatchObject({ eventType: "tweet.new" });
-    expect(await t.query(api.events.get, { streamEventId: "5" })).toBeNull();
+    await expect(convex.query(api.events.get, { streamEventId: "5" })).resolves.toBeNull();
   });
 });

@@ -1,4 +1,4 @@
-export type Shape =
+type Shape =
   | "string"
   | "number"
   | "boolean"
@@ -12,21 +12,21 @@ export type Shape =
   | { readonly union: readonly Shape[] }
   | { readonly ref: string };
 
-export interface Field {
+interface Field {
   readonly shape: Shape;
   readonly optional: boolean;
   readonly wire?: string;
 }
 
-export interface Param {
+interface Param {
   readonly name: string;
   readonly in: "path" | "query" | "header";
   readonly wire: string;
 }
 
-export type Response = "json" | "bytes" | "events" | "none";
+type Response = "json" | "bytes" | "events" | "none";
 
-export interface Operation {
+interface Operation {
   readonly method: string;
   readonly path: string;
   readonly params: readonly Param[];
@@ -36,7 +36,7 @@ export interface Operation {
   readonly result: Shape;
 }
 
-export interface Registry {
+interface Registry {
   readonly operations: Readonly<Record<string, Operation>>;
   readonly schemas: Readonly<Record<string, Shape>>;
 }
@@ -44,12 +44,13 @@ export interface Registry {
 const PRIMITIVES = new Set(["string", "number", "boolean", "null", "bytes", "any"]);
 const LOCATIONS: ReadonlySet<unknown> = new Set(["path", "query", "header"]);
 const RESPONSES: ReadonlySet<unknown> = new Set(["json", "bytes", "events", "none"]);
+const SHAPE_KINDS = 1;
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !isList(value);
 }
 
-export function isList(value: unknown): value is readonly unknown[] {
+function isList(value: unknown): value is readonly unknown[] {
   return Array.isArray(value);
 }
 
@@ -58,7 +59,7 @@ function isStrings(value: unknown): value is string[] {
 }
 
 function isFields(value: unknown): value is Record<string, Field> {
-  return isRecord(value) && Object.values(value).every(isField);
+  return isRecord(value) && Object.values(value).every((field) => isField(field));
 }
 
 function isField(value: unknown): value is Field {
@@ -70,19 +71,37 @@ function isField(value: unknown): value is Field {
   );
 }
 
-function isShapeEntry([kind, inner]: [string, unknown]): boolean {
-  if (kind === "literal") return ["string", "number", "boolean"].includes(typeof inner);
-  if (kind === "ref") return typeof inner === "string";
-  if (kind === "array" || kind === "record") return isShape(inner);
-  if (kind === "object") return isFields(inner);
-  return kind === "union" && isList(inner) && inner.every(isShape);
+function isShapeEntry([kind, inner]: readonly [string, unknown]): boolean {
+  if (kind === "literal") {
+    return ["string", "number", "boolean"].includes(typeof inner);
+  }
+  if (kind === "ref") {
+    return typeof inner === "string";
+  }
+  if (kind === "array" || kind === "record") {
+    return isShape(inner);
+  }
+  if (kind === "object") {
+    return isFields(inner);
+  }
+  return kind === "union" && isList(inner) && inner.every((shape) => isShape(shape));
 }
 
-export function isShape(value: unknown): value is Shape {
-  if (typeof value === "string") return PRIMITIVES.has(value);
-  if (!isRecord(value)) return false;
-  const [entry, ...rest] = Object.entries(value);
-  return entry !== undefined && rest.length === 0 && isShapeEntry(entry);
+function isSingleEntry(
+  entries: readonly (readonly [string, unknown])[],
+): entries is readonly [readonly [string, unknown]] {
+  return entries.length === SHAPE_KINDS;
+}
+
+function isShape(value: unknown): value is Shape {
+  if (typeof value === "string") {
+    return PRIMITIVES.has(value);
+  }
+  if (!isRecord(value)) {
+    return false;
+  }
+  const entries = Object.entries(value);
+  return isSingleEntry(entries) && isShapeEntry(entries[0]);
 }
 
 function isParam(value: unknown): value is Param {
@@ -112,13 +131,18 @@ function isRegistry(value: unknown): value is Registry {
   return (
     isRecord(value) &&
     isRecord(value["operations"]) &&
-    Object.values(value["operations"]).every(isOperation) &&
+    Object.values(value["operations"]).every((operation) => isOperation(operation)) &&
     isRecord(value["schemas"]) &&
-    Object.values(value["schemas"]).every(isShape)
+    Object.values(value["schemas"]).every((shape) => isShape(shape))
   );
 }
 
-export function parseRegistry(value: unknown): Registry {
-  if (isRegistry(value)) return value;
+function parseRegistry(value: unknown): Registry {
+  if (isRegistry(value)) {
+    return value;
+  }
   throw new Error("The operation registry is malformed. Run npm run generate.");
 }
+
+export { isList, isRecord, isShape, parseRegistry };
+export type { Field, Operation, Param, Registry, Response, Shape };

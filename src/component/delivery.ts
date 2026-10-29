@@ -1,66 +1,105 @@
-import type { Value } from "convex/values";
-import { parseOrText } from "./request.js";
 import { isList, isRecord } from "./shape.js";
-import { toValue, type EventFields } from "./values.js";
+import type { EventFields } from "./values.js";
+import { parseOrText } from "./request.js";
+import { toValue } from "./values.js";
 
-export const TOLERANCE_MS = 5 * 60 * 1000;
-export const NONCE_TTL_MS = 2 * TOLERANCE_MS;
+const TOLERANCE_MS = 300_000;
+const WINDOWS_PER_NONCE = 2;
+const NONCE_TTL_MS = WINDOWS_PER_NONCE * TOLERANCE_MS;
+const HEX_PER_BYTE = 2;
+const TIMESTAMP = /^\d{1,16}$/u;
+const NONCE = /^[0-9a-f]{32}$/u;
+const SIGNATURE = /^sha256=(?<mac>[0-9a-f]{64})$/u;
 
 const encoder = new TextEncoder();
 
-export type Check = { readonly ok: true; readonly nonce: string } | { readonly ok: false; readonly reason: string };
+type Check = { readonly ok: true; readonly nonce: string } | { readonly ok: false; readonly reason: string };
+
+type Delivery = { readonly kind: "test" } | { readonly kind: "event"; readonly event: EventFields };
 
 function bytes(hex: string): Uint8Array<ArrayBuffer> {
-  return Uint8Array.from({ length: hex.length / 2 }, (_item, index) =>
-    Number.parseInt(hex.slice(index * 2, index * 2 + 2), 16),
-  );
+  return Uint8Array.from({ length: hex.length / HEX_PER_BYTE }, (_item, index) => {
+    const start = index * HEX_PER_BYTE;
+    return Number.parseInt(hex.slice(start, start + HEX_PER_BYTE), 16);
+  });
 }
 
-export async function check(secret: string, headers: Headers, body: ArrayBuffer, now: number): Promise<Check> {
-  const timestamp = String(headers.get("x-xquik-timestamp"));
-  const nonce = String(headers.get("x-xquik-nonce"));
-  const mac = /^sha256=([0-9a-f]{64})$/.exec(String(headers.get("x-xquik-signature")))?.[1];
-  if (!/^\d{1,16}$/.test(timestamp) || Math.abs(now - Number(timestamp)) > TOLERANCE_MS) {
-    return { ok: false, reason: "stale timestamp" };
-  }
-  if (!/^[0-9a-f]{32}$/.test(nonce) || mac === undefined) {
-    return { ok: false, reason: "bad signature" };
-  }
-  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { name: "HMAC", hash: "SHA-256" }, false, [
+async function verify(secret: string, signed: string, mac: string, body: Readonly<ArrayBuffer>): Promise<boolean> {
+  const key = await crypto.subtle.importKey("raw", encoder.encode(secret), { hash: "SHA-256", name: "HMAC" }, false, [
     "verify",
   ]);
-  const prefix = encoder.encode(`${timestamp}.${nonce}.`);
+  const prefix = encoder.encode(signed);
   const message = new Uint8Array(prefix.length + body.byteLength);
   message.set(prefix);
   message.set(new Uint8Array(body), prefix.length);
-  const valid = await crypto.subtle.verify("HMAC", key, bytes(mac), message);
-  return valid ? { ok: true, nonce } : { ok: false, reason: "bad signature" };
+  return await crypto.subtle.verify("HMAC", key, bytes(mac), message);
 }
 
-export function readEvent(item: unknown, names: { readonly id: string; readonly type: string }): EventFields | null {
-  if (!isRecord(item)) return null;
-  const { [names.id]: streamEventId, [names.type]: eventType, occurredAt, monitorId, data } = item;
-  const time = typeof occurredAt === "string" ? Date.parse(occurredAt) : Number.NaN;
-  if (typeof streamEventId !== "string" || typeof eventType !== "string" || Number.isNaN(time)) return null;
-  return {
-    streamEventId,
-    eventType,
-    occurredAt: time,
-    ...(typeof monitorId === "string" ? { monitorId } : {}),
-    data: toValue(data),
-  };
+async function check(
+  secret: string,
+  headers: Readonly<Headers>,
+  body: Readonly<ArrayBuffer>,
+  now: number,
+): Promise<Check> {
+  const timestamp = String(headers.get("x-xquik-timestamp"));
+  const nonce = String(headers.get("x-xquik-nonce"));
+  const signature = SIGNATURE.exec(String(headers.get("x-xquik-signature")));
+  if (!TIMESTAMP.test(timestamp) || Math.abs(now - Number(timestamp)) > TOLERANCE_MS) {
+    return { ok: false, reason: "stale timestamp" };
+  }
+  if (!NONCE.test(nonce) || signature === null) {
+    return { ok: false, reason: "bad signature" };
+  }
+  if (await verify(secret, `${timestamp}.${nonce}.`, String(signature[1]), body)) {
+    return { nonce, ok: true };
+  }
+  return { ok: false, reason: "bad signature" };
 }
 
-export type Delivery = { readonly kind: "test" } | { readonly kind: "event"; readonly event: EventFields };
+function timeOf(value: unknown): number {
+  if (typeof value === "string") {
+    return Date.parse(value);
+  }
+  return Number.NaN;
+}
 
-export function readDelivery(raw: string): Delivery | null {
+function monitorOf(monitorId: unknown): { monitorId?: string } {
+  if (typeof monitorId === "string") {
+    return { monitorId };
+  }
+  return {};
+}
+
+function readEvent(item: unknown, names: { readonly id: string; readonly type: string }): EventFields | null {
+  if (!isRecord(item)) {
+    return null;
+  }
+  const { [names.id]: streamEventId, [names.type]: eventType, data, monitorId, occurredAt } = item;
+  const time = timeOf(occurredAt);
+  if (typeof streamEventId !== "string" || typeof eventType !== "string" || Number.isNaN(time)) {
+    return null;
+  }
+  return Object.assign(monitorOf(monitorId), { data: toValue(data), eventType, occurredAt: time, streamEventId });
+}
+
+function readDelivery(raw: string): Delivery | null {
   const body = parseOrText(raw);
-  if (isRecord(body) && body["eventType"] === "webhook.test") return { kind: "test" };
+  if (isRecord(body) && body["eventType"] === "webhook.test") {
+    return { kind: "test" };
+  }
   const event = readEvent(body, { id: "streamEventId", type: "eventType" });
-  return event === null ? null : { kind: "event", event };
+  if (event === null) {
+    return null;
+  }
+  return { event, kind: "event" };
 }
 
-export function pulledEvents(result: Value): EventFields[] {
-  const events = isRecord(result) ? result["events"] : undefined;
-  return isList(events) ? events.flatMap((item) => readEvent(item, { id: "id", type: "type" }) ?? []) : [];
+function pulledEvents(result: unknown): EventFields[] {
+  if (!isRecord(result) || !isList(result["events"])) {
+    return [];
+  }
+  return result["events"].flatMap((item) => readEvent(item, { id: "id", type: "type" }) ?? []);
 }
+
+export { check, NONCE_TTL_MS, pulledEvents, readDelivery, readEvent, TOLERANCE_MS };
+export type { Check, Delivery };

@@ -10,16 +10,18 @@ const mutate = execFileSync(
   .split("\n")
   .filter((file) => file.endsWith(".ts"));
 
-export default {
-  testRunner: "vitest",
-  vitest: { configFile: "vitest.config.js" },
-  coverageAnalysis: "perTest",
+const config = {
   checkers: ["typescript"],
-  tsconfigFile: "tsconfig.json",
+  concurrency: 8,
+  coverageAnalysis: "perTest",
+  jsonReporter: { fileName: "reports/mutation/mutation.json" },
   mutate,
   reporters: ["clear-text", "json", "progress"],
-  jsonReporter: { fileName: "reports/mutation/mutation.json" },
-  thresholds: { high: 100, low: 100, break: 100 },
-  concurrency: 8,
+  testRunner: "vitest",
+  thresholds: { break: 100, high: 100, low: 100 },
   timeoutMS: 10_000,
+  tsconfigFile: "tsconfig.json",
+  vitest: { configFile: "vitest.config.js" },
 };
+
+export default config;

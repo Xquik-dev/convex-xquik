@@ -1,8 +1,11 @@
 import { cronJobs } from "convex/server";
+import type { Crons } from "convex/server";
 import { internal } from "./_generated/api.js";
 
-const crons = cronJobs();
+function schedule(): Crons {
+  const crons = cronJobs();
+  crons.interval("purge expired webhook nonces", { minutes: 10 }, internal.webhooks.purge, {});
+  return crons;
+}
 
-crons.interval("purge expired webhook nonces", { minutes: 10 }, internal.webhooks.purge, {});
-
-export default crons;
+export default schedule();

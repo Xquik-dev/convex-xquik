@@ -1,7 +1,7 @@
-import type { TestConvex } from "convex-test";
 import type { GenericSchema, SchemaDefinition } from "convex/server";
 import type { ComponentApi } from "./component/_generated/component.js";
 import schema from "./component/schema.js";
+import type { TestConvex } from "convex-test";
 
 const modules: Record<string, () => Promise<unknown>> = {
   "./component/_generated/api.ts": async () => await import("./component/_generated/api.js"),
@@ -13,11 +13,14 @@ const modules: Record<string, () => Promise<unknown>> = {
   "./component/webhooks.ts": async () => await import("./component/webhooks.js"),
 };
 
-export function register<Schema extends SchemaDefinition<GenericSchema, boolean>>(
-  t: TestConvex<Schema>,
+function register<Schema extends SchemaDefinition<GenericSchema, boolean>>(
+  testConvex: Readonly<TestConvex<Schema>>,
   name = "xquik",
 ): ComponentApi {
-  return t.registerComponent<ComponentApi>(name, schema, modules);
+  return testConvex.registerComponent<ComponentApi>(name, schema, modules);
 }
 
-export default { register, schema, modules };
+const xquikTest = { modules, register, schema };
+
+export { register };
+export default xquikTest;
