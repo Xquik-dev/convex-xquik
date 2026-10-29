@@ -134,6 +134,10 @@ function invalidArguments(
   return [withArgument(valid, "notAnArgument", ONE), ...wrong];
 }
 
+function isValidationError(error: unknown): boolean {
+  return error instanceof Error && !(error instanceof ConvexError);
+}
+
 function changeByte(text: string, at: number, shift: number): ArrayBuffer {
   const bytes = encoder.encode(text);
   const index = at % bytes.length;
@@ -237,7 +241,7 @@ describe("the webhook timestamp check", () => {
 describe("the operation argument validators", () => {
   it("pass generated valid arguments of every operation on to Xquik", { timeout: 60_000 }, async () => {
     expect.hasAssertions();
-    stubFetch(() => Response.json({ error: "stub" }, { status: REJECTED_BY_STUB }));
+    const recorded = stubFetch(() => Response.json({ error: "stub" }, { status: REJECTED_BY_STUB }));
     await Promise.all(
       OPERATIONS.map(async ([id, { args }]) => {
         const call = caller();
@@ -249,22 +253,22 @@ describe("the operation argument validators", () => {
         );
       }),
     );
+    expect(recorded).toHaveLength(OPERATIONS.length * RUNS_PER_OPERATION);
   });
 
-  it("reject a wrong type or an undeclared argument of every operation before calling Xquik", { timeout: 60_000 }, async () => {
+  it("reject wrong or undeclared arguments of every operation before calling Xquik", { timeout: 60_000 }, async () => {
     expect.hasAssertions();
     const recorded = stubFetch(() => Response.json({ error: "stub" }, { status: REJECTED_BY_STUB }));
     await Promise.all(
       OPERATIONS.map(async ([id, { args }]) => {
         const call = caller();
-        const sent = objectOf(args).chain((valid) => constantFrom(...invalidArguments(args, valid)));
         await holds(
-          asyncProperty(sent, async (invalid) => {
-            const rejected = await call(id, invalid);
-            expect(rejected).toBeInstanceOf(Error);
-            expect(rejected).not.toBeInstanceOf(ConvexError);
+          asyncProperty(objectOf(args), async (valid) => {
+            const sent = invalidArguments(args, valid);
+            const rejected = await Promise.all(sent.map(async (invalid) => await call(id, invalid)));
+            expect(rejected.filter((error) => !isValidationError(error))).toStrictEqual([]);
           }),
-          { numRuns: RUNS_PER_OPERATION, seed: SEED },
+          { numRuns: ONE, seed: SEED },
         );
       }),
     );

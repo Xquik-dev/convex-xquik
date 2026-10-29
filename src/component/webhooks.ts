@@ -247,4 +247,4 @@ const purge = internalMutation({
   returns: v.number(),
 });
 
-export { add, create, drop, endpoint, ingest, insert, list, purge, PURGE_BATCH, remove, store, webhookOf };
+export { add, create, drop, endpoint, ingest, insert, list, purge, remove, store, webhookOf };

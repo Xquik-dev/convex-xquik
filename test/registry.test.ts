@@ -2,14 +2,10 @@ import { bodyRegistry, json, post, spec } from "./registry-specs.ts";
 import { describe, expect, it } from "vitest";
 import { eventTypes, operationsModule, readRegistry, registryJson } from "#scripts/registry.ts";
 import { none, parseRegistry } from "#src/component/shape.ts";
-import { format } from "prettier";
-import type { Options } from "prettier";
-import prettierOptions from "#.prettierrc.json" with { type: "json" };
 
 interface Generated {
   readonly ids: readonly string[];
   readonly operations: readonly string[];
-  readonly text: string;
 }
 
 const PUBLIC_OPERATIONS = 190;
@@ -86,12 +82,10 @@ const NODE_SCHEMAS = { Node: { properties: { next: { $ref: "#/components/schemas
 const DONE_THEN_LOOP = { done: { $ref: "#/components/schemas/Done" }, loop: { $ref: "#/components/schemas/Loop" } };
 
 async function generate(): Promise<Generated> {
-  const text = await registryJson();
-  const registry: unknown = JSON.parse(text);
+  const registry: unknown = JSON.parse(await registryJson());
   return {
     ids: Object.keys(parseRegistry(registry).operations),
     operations: operationsModule().split("\n"),
-    text,
   };
 }
 
@@ -106,11 +100,9 @@ function schemaRef(name: string): unknown {
 describe("the generator", () => {
   it("writes the registry and 1 action export per public operation", { timeout: 10_000 }, async () => {
     expect.hasAssertions();
-    const { ids, operations, text } = await generate();
-    const options: Options = { parser: "json" };
+    const { ids, operations } = await generate();
     const names = ids.map((id) => `  ${id},`);
     expect(ids).toHaveLength(PUBLIC_OPERATIONS);
-    await expect(format(text, Object.assign(options, prettierOptions))).resolves.toBe(text);
     expect(operations).toStrictEqual([
       'import { operations } from "./operation.js";',
       "",

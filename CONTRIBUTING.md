@@ -22,11 +22,11 @@ bin/check-local
 12. `tsc` checks the types with strict options and `moduleDetection` `force`. It also checks the JavaScript configuration files.
 13. ESLint runs the strict type-checked rules and every Convex rule on every file. ESLint bans `any`, type assertions and non-null assertions. Each public component function calls `requireApiKey` first, so it throws `missing_api_key` until the deployment sets `XQUIK_API_KEY`.
 14. oxlint runs type-aware on every file, with every rule of its 13 plugins at `error`. `import/no-nodejs-modules` bans Node built-in imports.
-15. The lint settings step fails when a file runs one of the 11 Convex rules below `error`. It also fails when oxlint runs a rule of its 13 plugins below `error`, or when a rule name matches the ban list. `lint/left-out-rules.json` names each exempt rule with the reason a failing proof gave, and each rule it clashes with must run.
+15. The lint settings step fails when a file runs one of the 11 Convex rules below `error`. It also fails when oxlint runs a rule of its 13 plugins below `error`, or when a rule name matches the ban list. `lint/left-out-rules.json` names each exempt rule with the reason a failing proof gave. Each rule an exempt rule clashes with must run at `error`.
 16. type-coverage needs every value of every tracked file typed without `any`.
 17. `npm audit` checks the dependencies, and `npm audit signatures` checks their registry signatures.
 18. Vitest runs every test, and a skipped test or a test marked to do later fails the step. The tests must run every line, branch, function and statement of every tracked source file in `src`, `scripts` and `example`, which `npm test` lists with `git ls-files`.
-19. fallow fails on a function over its complexity or CRAP limits, on any duplicated block, and on an unused file, export or dependency. Its CRAP scores read the coverage from step 18. `.fallowrc.json` names the modules that hold Convex functions as entry points.
+19. fallow fails on a function with more than 20 branches, a cognitive complexity over 15 or a CRAP score of 30 or more, its default. It computes CRAP from the coverage that step 18 writes. It also fails on any duplicated block and on an unused file, export or dependency. `.fallowrc.json` names the modules that hold Convex functions as entry points.
 20. Stryker must kill every mutant of the same files, with the TypeScript checker on.
 21. `npm pack` must hold the files that apps import.
 22. publint finds no error, warning or suggestion in the package, and Are the Types Wrong resolves every export for ESM apps and build tools.
