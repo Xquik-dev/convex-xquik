@@ -50,13 +50,13 @@ export class Xquik {
   /**
    * Schedules an operation as a durable job and returns its job ID.
    *
-   * A job with a `key` runs once at a time, so a second call with the same key returns the same job.
+   * While a job with the same `key` is scheduled or running, the call returns that job's ID.
    * Reads and writes that take an `Idempotency-Key` retry on a 429, a 5xx or a network error.
    *
-   * @param ctx A mutation context.
    * @param operation The operation name, such as `"getUser"`.
-   * @param args The operation's arguments, checked by its validator.
-   * @param options `key` keeps 1 job per key, `everyMs` repeats it, at 60,000 ms or more, and `delayMs` starts it later.
+   * @param args The operation's arguments, typed from its schema.
+   * @param options `key` keeps 1 scheduled job per key. `everyMs` repeats the job, at 60,000 ms or more.
+   * `delayMs` starts it later.
    */
   async schedule<Name extends OperationName>(
     ctx: MutationCtx,
@@ -70,8 +70,7 @@ export class Xquik {
   /**
    * Creates an Xquik webhook for the event types and an endpoint in the component that receives it.
    *
-   * @param ctx An action context.
-   * @param args `eventTypes` to deliver, and `onEvent`, a mutation that runs once for each stored event.
+   * @param args `eventTypes` to deliver, and `onEvent`, a mutation that runs after each new delivery to this endpoint.
    * @returns The endpoint ID, its URL and the Xquik webhook ID.
    */
   async createWebhook(
@@ -85,8 +84,7 @@ export class Xquik {
   /**
    * Adds an endpoint for a webhook you created elsewhere, with its signing secret.
    *
-   * @param ctx A mutation context.
-   * @param args The webhook's `secret`, and `onEvent`, a mutation that runs once for each stored event.
+   * @param args The webhook's `secret`, and `onEvent`, a mutation that runs after each new delivery to this endpoint.
    * @returns The endpoint ID and the URL to give Xquik.
    */
   async addWebhook(
