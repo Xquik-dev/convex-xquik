@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { isList, isRecord } from "#src/component/shape.ts";
+import { isList, isRecord, none } from "#src/component/shape.ts";
 import convex from "@convex-dev/eslint-plugin";
 import { ESLint } from "eslint";
 import { execFileSync } from "node:child_process";
@@ -9,8 +9,6 @@ import { readFileSync } from "node:fs";
 const ERROR = 2;
 const CONVEX_RULES = 11;
 const NONE = 0;
-const RULE_CLASHES = 5;
-const BANNED_NAMES = 1;
 const PLUGINS = new Set([
   "eslint",
   "import",
@@ -27,16 +25,12 @@ const PLUGINS = new Set([
   "vitest",
 ]);
 const LEFT_OUT = {
-  "import/no-default-export": "Convex needs the default export of convex.config.ts, schema.ts, http.ts and crons.ts.",
-  "import/no-named-export": "Convex names each registered function after its named export.",
+  "import/no-default-export": "Convex codegen fails unless convex.config.ts has a default export.",
+  "import/no-named-export": "Convex names each function after its export, so a default export renames events.list.",
   "import/no-nodejs-modules": "The generator writes files, and the configs and this test run git and oxlint.",
-  "no-undefined": "Convex removes a field from a document only when patch passes it undefined.",
-  "oxc/no-async-await": "typescript/promise-function-async",
-  "unicorn/no-null": "Convex has no undefined value, so the schema and the returns validators hold null.",
-  "vitest/no-importing-vitest-globals": "vitest/prefer-importing-vitest-globals",
-  "vitest/prefer-called-once": "vitest/prefer-called-times",
-  "vitest/prefer-to-be-falsy": "vitest/prefer-strict-boolean-matchers",
-  "vitest/prefer-to-be-truthy": "vitest/prefer-strict-boolean-matchers",
+  "oxc/no-async-await": "A mutation must await what it reads, and the then and plain Promise forms fail other rules.",
+  "vitest/no-importing-vitest-globals":
+    "An alias such as it as check hides each test from require-hook and expect-expect.",
 };
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
@@ -60,7 +54,7 @@ function entry(value: unknown, key: string): unknown {
   if (isRecord(value)) {
     return value[key];
   }
-  return null;
+  return none;
 }
 
 function level(setting: unknown): unknown {
@@ -110,7 +104,6 @@ const registered = rulesOf(listing)
   .map((rule) => ruleName(rule))
   .toSorted();
 const running = new Set(registered.filter((name) => severity(printed, name) === "deny"));
-const contradicted = Object.values(LEFT_OUT).filter((reason) => registered.includes(reason));
 const banned = registered.filter((name) => bans.some((pattern) => bannedBy(pattern, name)));
 
 describe("lint", () => {
@@ -129,17 +122,13 @@ describe("lint", () => {
   });
 
   it(
-    "every oxlint rule of the 13 plugins runs at error unless it clashes or the ban list names it",
+    "every oxlint rule of the 13 plugins runs at error except the ones a failing proof keeps out",
     { timeout: 30_000 },
     () => {
       expect.hasAssertions();
       expect(registered).toContain("typescript/no-floating-promises");
-      expect(registered.filter((name) => !running.has(name))).toStrictEqual(
-        [...banned, ...Object.keys(LEFT_OUT)].toSorted(),
-      );
-      expect(banned).toHaveLength(BANNED_NAMES);
-      expect(contradicted).toHaveLength(RULE_CLASHES);
-      expect(contradicted.filter((rule) => !running.has(rule))).toStrictEqual([]);
+      expect(registered.filter((name) => !running.has(name))).toStrictEqual(Object.keys(LEFT_OUT).toSorted());
+      expect(banned).toStrictEqual([]);
     },
   );
 

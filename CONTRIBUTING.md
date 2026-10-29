@@ -20,7 +20,7 @@ bin/check-local
 10. Prettier checks the format of every TypeScript, JavaScript and Markdown file.
 11. `tsc` checks the types with strict options and `moduleDetection` `force`. It also checks the JavaScript configuration files.
 12. ESLint runs the strict type-checked rules and every Convex rule on every file, and `test/lint.test.ts` fails when a file runs a Convex rule below `error`. ESLint bans `any`, type assertions and non-null assertions. Each public component function calls `requireApiKey` first, so it throws `missing_api_key` until the deployment sets `XQUIK_API_KEY`.
-13. oxlint runs type-aware on every file, with every rule of its 13 plugins at `error`. `test/lint.test.ts` fails when a rule that oxlint registers for those plugins runs below `error`. It exempts the 10 rules it names, each with the rule or Convex requirement it contradicts, and the 1 rule the ban list matches.
+13. oxlint runs type-aware on every file, with every rule of its 13 plugins at `error`. `test/lint.test.ts` fails when a rule that oxlint registers for those plugins runs below `error`, or when a rule name matches the ban list. It exempts only the rules it names, each with the reason a failing proof gave.
 14. type-coverage needs every value of every tracked file typed without `any`.
 15. `npm audit` checks the dependencies, and `npm audit signatures` checks their registry signatures.
 16. Vitest runs every test, and a skipped test or a test marked to do later fails the step. The tests must run every line, branch, function and statement of every tracked source file.
