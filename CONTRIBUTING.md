@@ -26,7 +26,7 @@ bin/check-local
 16. Vitest runs every test, and a skipped test or a test marked to do later fails the step. The tests must run every line, branch, function and statement of every tracked source file.
 17. Stryker must kill every mutant of every tracked source file, with the TypeScript checker on.
 18. `npm pack` must hold the files that apps import.
-19. publint finds no error, warning or suggestion in the package, and Are the Types Wrong resolves every export for ESM apps and bundlers.
+19. publint finds no error, warning or suggestion in the package, and Are the Types Wrong resolves every export for ESM apps and build tools.
 20. CodeQL runs its security-extended queries over the tracked files.
 
 Fix what a check finds. Never suppress a finding or narrow a check.
