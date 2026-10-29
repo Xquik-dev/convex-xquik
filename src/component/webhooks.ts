@@ -62,7 +62,7 @@ async function store(ctx: EventWriter, event: EventFields): Promise<void> {
     .query("events")
     .withIndex("by_stream_event", (range) => range.eq("streamEventId", event.streamEventId))
     .unique();
-  if (!existing) {
+  if (existing === null) {
     await ctx.db.insert("events", event);
   }
 }
@@ -83,7 +83,7 @@ async function accept(
   await ctx.db.insert("receipts", { endpointId, streamEventId });
   await store(ctx, event);
   const found = await ctx.db.get("endpoints", endpointId);
-  if (found && typeof found.onEvent === "string" && isHandle(found.onEvent)) {
+  if (found !== null && typeof found.onEvent === "string" && isHandle(found.onEvent)) {
     await ctx.scheduler.runAfter(IMMEDIATELY, found.onEvent, { event });
   }
   return "stored";
@@ -170,8 +170,8 @@ const webhookOf = internalQuery({
   args: { endpointId: v.id("endpoints") },
   handler: async (ctx, { endpointId }) => {
     const found = await ctx.db.get("endpoints", endpointId);
-    if (!found) {
-      return found;
+    if (found === null) {
+      return null;
     }
     return found.webhookId;
   },

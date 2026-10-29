@@ -46,12 +46,8 @@ const LOCATIONS: ReadonlySet<unknown> = new Set(["path", "query", "header"]);
 const RESPONSES: ReadonlySet<unknown> = new Set(["json", "bytes", "events", "none"]);
 const SHAPE_KINDS = 1;
 
-function isNull(value: unknown): value is null {
-  return value === null;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && !isNull(value) && !isList(value);
+  return typeof value === "object" && value !== null && !isList(value);
 }
 
 function isList(value: unknown): value is readonly unknown[] {
@@ -124,7 +120,7 @@ function isOperation(value: unknown): value is Operation {
     typeof value["path"] === "string" &&
     isList(value["params"]) &&
     value["params"].every(isParam) &&
-    (isNull(value["body"]) || isStrings(value["body"])) &&
+    (value["body"] === null || isStrings(value["body"])) &&
     RESPONSES.has(value["response"]) &&
     isFields(value["args"]) &&
     isShape(value["result"])
@@ -148,5 +144,5 @@ function parseRegistry(value: unknown): Registry {
   throw new Error("The operation registry is malformed. Run npm run generate.");
 }
 
-export { isList, isNull, isRecord, isShape, parseRegistry };
+export { isList, isRecord, isShape, parseRegistry };
 export type { Field, Operation, Param, Registry, Response, Shape };

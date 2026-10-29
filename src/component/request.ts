@@ -56,7 +56,7 @@ function headers(operation: Operation, args: Inputs, apiKey: string): Headers {
 }
 
 function body(operation: Operation, args: Inputs): string | null {
-  if (!operation.body) {
+  if (operation.body === null) {
     return null;
   }
   return JSON.stringify(Object.fromEntries(operation.body.map((name) => [name, args[name]])));
@@ -106,7 +106,7 @@ async function drain(reader: Reader, decoder: Readonly<TextDecoder>, raw: string
 }
 
 async function readEvents(stream: Stream | null, streamMs: number): Promise<Value> {
-  if (!stream) {
+  if (stream === null) {
     return [];
   }
   const reader = stream.getReader();
