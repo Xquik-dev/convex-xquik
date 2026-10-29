@@ -70,7 +70,7 @@ export class Xquik {
   /**
    * Creates an Xquik webhook for the event types and an endpoint in the component that receives it.
    *
-   * @param args `eventTypes` to deliver, and `onEvent`, a mutation that runs after each new delivery to this endpoint.
+   * @param args `eventTypes` to deliver, and `onEvent`, a mutation that runs once for each `streamEventId` this endpoint receives. A retry or the `webhook.test` alert does not run it.
    * @returns The endpoint ID, its URL and the Xquik webhook ID.
    */
   async createWebhook(
@@ -84,7 +84,7 @@ export class Xquik {
   /**
    * Adds an endpoint for a webhook you created elsewhere, with its signing secret.
    *
-   * @param args The webhook's `secret`, and `onEvent`, a mutation that runs after each new delivery to this endpoint.
+   * @param args The webhook's `secret`, and `onEvent`, a mutation that runs once for each `streamEventId` this endpoint receives. A retry or the `webhook.test` alert does not run it.
    * @returns The endpoint ID and the URL to give Xquik.
    */
   async addWebhook(
