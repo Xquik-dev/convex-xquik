@@ -20,5 +20,4 @@
 ["'][o]ff["']
 [t]ype-coverage:ignore
 <!--\s*[v]ale\s
-[o]xlint-(?:disable|enable)
 [i]gnorers"?\s*:

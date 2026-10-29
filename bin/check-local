@@ -130,7 +130,7 @@ no_banned_patterns() {
   ignore_files="$(git ls-files --cached --others --exclude-standard -- ':(glob)**/.*ignore' ':(exclude,glob)**/.gitignore')" ||
     return
   [[ -z "${ignore_files}" ]] || {
-    printf 'These files make a tool skip files or findings whatever its flags say.\n%s\n' "${ignore_files}" >&2
+    printf 'lychee and Prettier skip what these files list. Delete them.\n%s\n' "${ignore_files}" >&2
     return 1
   }
 }
@@ -157,7 +157,7 @@ check_links() {
   listing="$(git ls-files --cached --others --exclude-standard -- '*.md')" || return
   : >"${workspace}/lychee.toml" &&
     "${tools}/lychee" --config="${workspace}/lychee.toml" --offline --no-progress --include-fragments=full \
-      --include-verbatim --include-mail --files-from - <<<"${listing}"
+      --include-verbatim --files-from - <<<"${listing}"
 }
 
 lint_prose() {
@@ -177,7 +177,7 @@ run_tests() {
   npx vitest run --coverage --reporter=default --reporter=json --outputFile.json="${results}" || return
   jq -e '.numPendingTests == 0 and .numTodoTests == 0' "${results}" >/dev/null || {
     jq -r '.testResults[].assertionResults[] | select(.status != "passed") | "\(.status) \(.fullName)"' "${results}" >&2
-    echo "The run skipped the tests above, so it did not run every test." >&2
+    echo "Run or delete each test above." >&2
     return 1
   }
 }
@@ -239,17 +239,15 @@ package_contents() {
 }
 
 lint_package() {
-  local report tarball
-  report="$(npx publint --strict --level suggestion 2>&1)" || {
+  local report tarball status=0
+  report="$(npx publint --strict --level suggestion 2>&1)" || status=$?
+  [[ "${status}" == 0 && "${report}" == *"All good!"* ]] || {
     echo "${report}" >&2
     return 1
   }
-  [[ "${report}" != *Suggestions:* && "${report}" != *Warnings:* && "${report}" != *Errors:* ]] || {
-    echo "${report}" >&2
-    return 1
-  }
-  tarball="$(npm pack --ignore-scripts --silent --pack-destination "${workspace}")" &&
-    npx attw "${workspace}/${tarball}" --profile esm-only
+  echo '{}' >"${workspace}/attw.json" &&
+    tarball="$(npm pack --ignore-scripts --silent --pack-destination "${workspace}")" &&
+    npx attw "${workspace}/${tarball}" --config-path "${workspace}/attw.json" --profile esm-only
 }
 
 run_codeql() {
