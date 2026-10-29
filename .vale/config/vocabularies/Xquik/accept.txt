@@ -1,0 +1,17 @@
+Apify
+ESLint
+gitleaks
+jq
+nonces
+npm
+oxlint
+Packagist
+publint
+repos
+shellcheck
+Stryker
+uv
+validator
+Vitest
+Xquik
+xquik\.com
