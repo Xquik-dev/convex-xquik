@@ -1,6 +1,6 @@
 import { check, readDelivery } from "./delivery.js";
 import type { ActionCtx } from "./_generated/server.js";
-import type { EventFields } from "./values.js";
+import type { Delivery } from "./delivery.js";
 import { httpAction } from "./_generated/server.js";
 import { httpRouter } from "convex/server";
 import type { HttpRouter } from "convex/server";
@@ -15,7 +15,7 @@ const SLASH = "/";
 type Runner = Readonly<Pick<ActionCtx, "runMutation" | "runQuery">>;
 
 type Admission =
-  | { readonly ok: true; readonly event: EventFields | null; readonly nonce: string }
+  | { readonly ok: true; readonly delivery: Delivery; readonly nonce: string }
   | { readonly ok: false; readonly reason: string; readonly status: number };
 
 function reply(status: number, text: string): Response {
@@ -33,13 +33,10 @@ async function admit(secret: string, headers: Readonly<Headers>, body: Readonly<
     return { ok: false, reason: verdict.reason, status: UNAUTHORIZED };
   }
   const delivery = readDelivery(new TextDecoder().decode(body));
-  if (delivery === null) {
+  if (delivery.kind === "invalid") {
     return { ok: false, reason: "not an Xquik delivery", status: BAD_REQUEST };
   }
-  if (delivery.kind === "test") {
-    return { event: null, nonce: verdict.nonce, ok: true };
-  }
-  return { event: delivery.event, nonce: verdict.nonce, ok: true };
+  return { delivery, nonce: verdict.nonce, ok: true };
 }
 
 function answer(outcome: string): Response {
@@ -51,7 +48,7 @@ function answer(outcome: string): Response {
 
 const receive = httpAction(async (ctx: Runner, request): Promise<Response> => {
   const endpoint = await ctx.runQuery(internal.webhooks.endpoint, { token: tokenOf(request.url) });
-  if (endpoint === null) {
+  if (!endpoint) {
     return reply(NOT_FOUND, "unknown webhook URL");
   }
   const admission = await admit(endpoint.secret, request.headers, await request.arrayBuffer());
@@ -59,8 +56,8 @@ const receive = httpAction(async (ctx: Runner, request): Promise<Response> => {
     return reply(admission.status, admission.reason);
   }
   const { _id: endpointId } = endpoint;
-  const { event, nonce } = admission;
-  return answer(await ctx.runMutation(internal.webhooks.ingest, { endpointId, event, nonce }));
+  const { delivery, nonce } = admission;
+  return answer(await ctx.runMutation(internal.webhooks.ingest, { delivery, endpointId, nonce }));
 });
 
 function router(): HttpRouter {

@@ -1,4 +1,4 @@
-[e]slint-(?:disable|enable)
+(?<![\w-])[e]slint-(?:disable|enable)
 [o]xlint-(?:disable|enable)
 [s]tryker\s+(?:disable|restore)
 [@]ts-(?:ignore|expect-error|nocheck)

@@ -12,7 +12,7 @@ const xquik = new Xquik(components.xquik);
 
 async function requireUser(ctx: { readonly auth: Readonly<Auth> }): Promise<string> {
   const identity = await ctx.auth.getUserIdentity();
-  if (identity === null) {
+  if (!identity) {
     throw new ConvexError({ error: "unauthenticated", message: "Sign in first.", status: 401 });
   }
   return identity.subject;
@@ -55,7 +55,6 @@ const onEvent = internalMutation({
   args: { event: eventFields },
   handler: async (ctx, { event }) => {
     await ctx.db.insert("notifications", { eventType: event.eventType, streamEventId: event.streamEventId });
-    return null;
   },
   returns: v.null(),
 });

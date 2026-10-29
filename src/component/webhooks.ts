@@ -1,13 +1,13 @@
 import { action, env, internalMutation, internalQuery, mutation, query } from "./_generated/server.js";
 import { argument, find, send } from "./request.js";
 import { ConvexError, v } from "convex/values";
+import { delivery, NONCE_TTL_MS } from "./delivery.js";
 import type { GenericId, Infer } from "convex/values";
+import { isRecord, none } from "./shape.js";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import type { FunctionHandle } from "convex/server";
 import { internal } from "./_generated/api.js";
-import { isRecord } from "./shape.js";
 import type { MutationCtx } from "./_generated/server.js";
-import { NONCE_TTL_MS } from "./delivery.js";
 import requireApiKey from "./access.js";
 import schema from "./schema.js";
 import { STREAM_MS } from "./operation.js";
@@ -26,9 +26,7 @@ const endpointPage = paginationResultValidator(endpointView);
 
 const endpointDoc = schema.tables.endpoints.validator.extend({ _creationTime: v.number(), _id: v.id("endpoints") });
 
-const eventFields = schema.tables.events.validator;
-
-type EventFields = Infer<typeof eventFields>;
+type EventFields = Infer<typeof schema.tables.events.validator>;
 
 interface EventWriter {
   readonly db: Readonly<Pick<MutationCtx["db"], "get" | "insert" | "query">>;
@@ -64,7 +62,7 @@ async function store(ctx: EventWriter, event: EventFields): Promise<void> {
     .query("events")
     .withIndex("by_stream_event", (range) => range.eq("streamEventId", event.streamEventId))
     .unique();
-  if (existing === null) {
+  if (!existing) {
     await ctx.db.insert("events", event);
   }
 }
@@ -79,13 +77,13 @@ async function accept(
     .query("receipts")
     .withIndex("by_event", (range) => range.eq("endpointId", endpointId).eq("streamEventId", streamEventId))
     .unique();
-  if (receipt !== null) {
+  if (receipt) {
     return "duplicate";
   }
   await ctx.db.insert("receipts", { endpointId, streamEventId });
   await store(ctx, event);
   const found = await ctx.db.get("endpoints", endpointId);
-  if (found !== null && typeof found.onEvent === "string" && isHandle(found.onEvent)) {
+  if (found && typeof found.onEvent === "string" && isHandle(found.onEvent)) {
     await ctx.scheduler.runAfter(IMMEDIATELY, found.onEvent, { event });
   }
   return "stored";
@@ -149,9 +147,9 @@ const list = query({
     return Object.assign(endpoints, {
       page: endpoints.page.map(({ _id, testedAt, token, webhookId }) => ({
         endpointId: _id,
-        testedAt: testedAt ?? null,
+        testedAt: testedAt ?? none,
         url: urlOf(token),
-        webhookId: webhookId ?? null,
+        webhookId: webhookId ?? none,
       })),
     });
   },
@@ -172,10 +170,10 @@ const webhookOf = internalQuery({
   args: { endpointId: v.id("endpoints") },
   handler: async (ctx, { endpointId }) => {
     const found = await ctx.db.get("endpoints", endpointId);
-    if (found === null) {
-      return null;
+    if (!found) {
+      return found;
     }
-    return found.webhookId ?? null;
+    return found.webhookId;
   },
   returns: v.union(v.null(), v.string()),
 });
@@ -184,46 +182,47 @@ const drop = internalMutation({
   args: { endpointId: v.id("endpoints") },
   handler: async (ctx, { endpointId }) => {
     await ctx.db.delete("endpoints", endpointId);
-    return null;
   },
   returns: v.null(),
 });
 
 const remove = action({
   args: { endpointId: v.id("endpoints") },
-  handler: async (ctx, { endpointId }): Promise<null> => {
+  handler: async (ctx, { endpointId }): Promise<void> => {
     const apiKey = requireApiKey(env.XQUIK_API_KEY);
     const webhookId = await ctx.runQuery(internal.webhooks.webhookOf, { endpointId });
-    if (webhookId !== null) {
+    if (typeof webhookId === "string") {
       await send(find("deleteWebhook"), { id: webhookId }, { apiKey, streamMs: STREAM_MS });
     }
     await ctx.runMutation(internal.webhooks.drop, { endpointId });
-    return null;
   },
   returns: v.null(),
 });
 
 const ingest = internalMutation({
   args: {
+    delivery,
     endpointId: v.id("endpoints"),
-    event: v.union(v.null(), eventFields),
     nonce: v.string(),
   },
-  handler: async (ctx, { endpointId, event, nonce }): Promise<"replay" | "test" | "stored" | "duplicate"> => {
+  handler: async (
+    ctx,
+    { delivery: arrived, endpointId, nonce },
+  ): Promise<"replay" | "test" | "stored" | "duplicate"> => {
     const seen = await ctx.db
       .query("nonces")
       .withIndex("by_nonce", (range) => range.eq("endpointId", endpointId).eq("nonce", nonce))
       .unique();
-    if (seen !== null) {
+    if (seen) {
       return "replay";
     }
     const now = Date.now();
     await ctx.db.insert("nonces", { endpointId, expiresAt: now + NONCE_TTL_MS, nonce });
-    if (event === null) {
+    if (arrived.kind === "test") {
       await ctx.db.patch("endpoints", endpointId, { testedAt: now });
       return "test";
     }
-    return await accept(ctx, endpointId, event);
+    return await accept(ctx, endpointId, arrived.event);
   },
   returns: v.union(v.literal("replay"), v.literal("test"), v.literal("stored"), v.literal("duplicate")),
 });

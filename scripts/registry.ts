@@ -1,5 +1,6 @@
 import { objectAt, stringsAt } from "./nodes.ts";
 import { readFile, writeFile } from "node:fs/promises";
+import { none } from "#src/component/shape.ts";
 import Reader from "./reader.ts";
 import type { Registry } from "#src/component/shape.ts";
 
@@ -43,7 +44,7 @@ function renderOperations(registry: Registry): string {
 async function writeGenerated(root: string): Promise<void> {
   const spec: unknown = JSON.parse(await readFile(`${root}/openapi.json`, "utf8"));
   const registry = readRegistry(spec);
-  await writeFile(`${root}/src/component/registry.json`, `${JSON.stringify(registry, null, JSON_INDENT)}\n`);
+  await writeFile(`${root}/src/component/registry.json`, `${JSON.stringify(registry, none, JSON_INDENT)}\n`);
   await writeFile(`${root}/src/component/operations.ts`, renderOperations(registry));
 }
 

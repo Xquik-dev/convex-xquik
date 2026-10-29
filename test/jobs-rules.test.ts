@@ -4,12 +4,13 @@ import { describe, expect, it } from "vitest";
 import { failed, isLive, plan } from "#src/component/job.ts";
 import { ConvexError } from "convex/values";
 import { find } from "#src/component/request.ts";
+import { none } from "#src/component/shape.ts";
 import type { Outcome } from "#src/component/job.ts";
 
 const NO_JOBS = 0;
 const ONE_JOB = 1;
 const NO_REQUESTS = 0;
-const PAGE = { cursor: null, numItems: 5 };
+const PAGE = { cursor: none, numItems: 5 };
 
 describe("job queries", () => {
   it("lists jobs by status and refuses bad input", { timeout: 10_000 }, async () => {
@@ -41,17 +42,18 @@ describe("job queries", () => {
     await convex.mutation(api.jobs.cancel, { jobId });
     const recorded = stubFetch(() => Response.json({}));
     await convex.action(internal.jobs.run, { jobId });
-    await convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: null } });
+    await convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: none } });
     expect(recorded).toHaveLength(NO_REQUESTS);
     await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({ runs: 0, status: "canceled" });
+    await expect(convex.query(api.jobs.get, { jobId })).resolves.not.toHaveProperty("scheduledId");
   });
 });
 
 describe(plan, () => {
-  const ok: Outcome = { ok: true, result: null };
-  const transient: Outcome = { error: null, ok: false, retryable: true };
-  const delayed: Outcome = { error: null, ok: false, retryAfterMs: 5, retryable: true };
-  const permanent: Outcome = { error: null, ok: false, retryable: false };
+  const ok: Outcome = { ok: true, result: none };
+  const transient: Outcome = { error: none, ok: false, retryable: true };
+  const delayed: Outcome = { error: none, ok: false, retryAfterMs: 5, retryable: true };
+  const permanent: Outcome = { error: none, ok: false, retryable: false };
 
   it("retries with exponential backoff or the server's delay", { timeout: 10_000 }, () => {
     expect.hasAssertions();
@@ -62,9 +64,9 @@ describe(plan, () => {
 
   it("stops at the last attempt or a permanent error", { timeout: 10_000 }, () => {
     expect.hasAssertions();
-    expect(plan({ attempts: 4 }, transient)).toStrictEqual({ attempts: 0, delayMs: null, status: "failed" });
-    expect(plan({ attempts: 0 }, permanent)).toStrictEqual({ attempts: 0, delayMs: null, status: "failed" });
-    expect(plan({ attempts: 2 }, ok)).toStrictEqual({ attempts: 0, delayMs: null, status: "succeeded" });
+    expect(plan({ attempts: 4 }, transient)).toStrictEqual({ attempts: 0, status: "failed" });
+    expect(plan({ attempts: 0 }, permanent)).toStrictEqual({ attempts: 0, status: "failed" });
+    expect(plan({ attempts: 2 }, ok)).toStrictEqual({ attempts: 0, status: "succeeded" });
   });
 
   it("keeps a repeating job on its interval", { timeout: 10_000 }, () => {
@@ -89,35 +91,40 @@ describe(failed, () => {
       retryAfterMs: 2000,
       retryable: true,
     });
-    expect(failed(read, new ConvexError({ status: 500 })).retryable).toBe(true);
-    expect(failed(read, new ConvexError({ status: 404 })).retryable).toBe(false);
     expect(failed(read, new TypeError("fetch failed"))).toStrictEqual({
       error: { message: "TypeError: fetch failed" },
       ok: false,
       retryable: true,
     });
-    expect(failed(read, new ConvexError("plain")).retryable).toBe(true);
+    const errors = [new ConvexError({ status: 500 }), new ConvexError({ status: 404 }), new ConvexError("plain")];
+    expect(errors.map((error) => failed(read, error).retryable)).toStrictEqual([true, false, true]);
   });
 
   it("retries a write only when it carries an Idempotency-Key", { timeout: 10_000 }, () => {
     expect.hasAssertions();
-    expect(failed(write, new ConvexError({ status: 503 })).retryable).toBe(false);
-    expect(failed(find("deleteDraft"), new ConvexError({ status: 503 })).retryable).toBe(false);
-    expect(failed(find("createExtraction"), new ConvexError({ status: 503 })).retryable).toBe(true);
+    const operations = [write, find("deleteDraft"), find("createExtraction")];
+    expect(operations.map((operation) => failed(operation, new ConvexError({ status: 503 })).retryable)).toStrictEqual([
+      false,
+      false,
+      true,
+    ]);
   });
 
   it("treats an error that carries no data as transient", { timeout: 10_000 }, () => {
     expect.hasAssertions();
-    expect(failed(read, new ConvexError(null))).toStrictEqual({ error: null, ok: false, retryable: true });
+    expect(failed(read, new ConvexError(none))).toStrictEqual({ error: none, ok: false, retryable: true });
   });
 });
 
 describe(isLive, () => {
   it("counts a run as live only while its scheduled function waits or runs", { timeout: 10_000 }, () => {
     expect.hasAssertions();
-    expect(isLive({ state: { kind: "pending" } })).toBe(true);
-    expect(isLive({ state: { kind: "inProgress" } })).toBe(true);
-    expect(isLive({ state: { kind: "canceled" } })).toBe(false);
-    expect(isLive(null)).toBe(false);
+    const runs = [
+      { state: { kind: "pending" } },
+      { state: { kind: "inProgress" } },
+      { state: { kind: "canceled" } },
+      none,
+    ];
+    expect(runs.map((scheduled) => isLive(scheduled))).toStrictEqual([true, true, false, false]);
   });
 });
