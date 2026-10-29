@@ -21,7 +21,7 @@ bin/check-local
 11. Prettier checks the format of every TypeScript, JavaScript, Markdown, JSON and YAML file.
 12. `tsc` checks the types with strict options and `moduleDetection` `force`. It also checks the JavaScript configuration files.
 13. ESLint runs the strict type-checked rules and every Convex rule on every file. ESLint bans `any`, type assertions and non-null assertions. Each public component function calls `requireApiKey` first, so it throws `missing_api_key` until the deployment sets `XQUIK_API_KEY`.
-14. oxlint runs type-aware on every file, with every rule of its 13 plugins at `error`. `import/no-nodejs-modules` keeps Node built-in modules out of every file, so the component, the generator and the tests run on Web APIs alone.
+14. oxlint runs type-aware on every file, with every rule of its 13 plugins at `error`. `import/no-nodejs-modules` keeps Node built-in modules out of every file, so the component, the generator and the tests need only what the Web platform offers.
 15. The lint settings step fails when a file runs one of the 11 Convex rules below `error`. It also fails when oxlint runs a rule of its 13 plugins below `error`, or when a rule name matches the ban list. `lint/left-out-rules.json` names each exempt rule with the reason a failing proof gave.
 16. fallow fails on a function over its complexity limits in `.fallowrc.json`, on any duplicated block, and on an unused file, export or dependency. Convex loads every module in `src/component`, so `.fallowrc.json` names them as entry points.
 17. type-coverage needs every value of every tracked file typed without `any`.
