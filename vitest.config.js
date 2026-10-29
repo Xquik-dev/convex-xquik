@@ -1,6 +1,5 @@
-import { execFileSync } from "node:child_process";
-import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
+import { execFileSync } from "node:child_process";
 
 const tracked = execFileSync(
   "git",
@@ -16,21 +15,23 @@ export default defineConfig({
   resolve: {
     alias: [
       {
-        find: /^xquik-convex\/convex\.config\.js$/,
-        replacement: fileURLToPath(new URL("src/component/convex.config.ts", import.meta.url)),
+        find: /^xquik-convex\/convex\.config\.js$/u,
+        replacement: `${import.meta.dirname}/src/component/convex.config.ts`,
       },
-      { find: /^xquik-convex$/, replacement: fileURLToPath(new URL("src/client/index.ts", import.meta.url)) },
+      { find: /^xquik-convex$/u, replacement: `${import.meta.dirname}/src/client.ts` },
     ],
   },
   test: {
-    environment: "edge-runtime",
-    server: { deps: { inline: ["convex-test"] } },
-    include: ["test/**/*.test.ts"],
     coverage: {
-      provider: "v8",
       include: tracked,
+      provider: "v8",
       reporter: ["text-summary", "lcov", "json-summary"],
-      thresholds: { lines: 100, branches: 100, functions: 100, statements: 100 },
+      thresholds: { branches: 100, functions: 100, lines: 100, statements: 100 },
     },
+    environment: "edge-runtime",
+    include: ["test/**/*.test.ts"],
+    server: { deps: { inline: ["convex-test"] } },
+    unstubEnvs: true,
+    unstubGlobals: true,
   },
 });

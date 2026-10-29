@@ -1,26 +1,42 @@
 import { defineSchema, defineTable } from "convex/server";
-import { v } from "convex/values";
 import { eventFields, json } from "./values.js";
+import { v } from "convex/values";
 
-export const jobStatus = v.union(
-  v.literal("scheduled"),
-  v.literal("succeeded"),
-  v.literal("failed"),
-  v.literal("canceled"),
-);
+const jobStatus = v.union(v.literal("scheduled"), v.literal("succeeded"), v.literal("failed"), v.literal("canceled"));
+
+const endpointFields = {
+  onEvent: v.optional(v.string()),
+  secret: v.string(),
+  testedAt: v.optional(v.number()),
+  token: v.string(),
+  webhookId: v.optional(v.string()),
+};
+
+const jobFields = {
+  args: v.record(v.string(), json),
+  attempts: v.number(),
+  error: v.optional(json),
+  everyMs: v.optional(v.number()),
+  key: v.optional(v.string()),
+  operation: v.string(),
+  result: v.optional(json),
+  runs: v.number(),
+  scheduledId: v.optional(v.id("_scheduled_functions")),
+  status: jobStatus,
+};
 
 export default defineSchema({
-  endpoints: defineTable({
-    token: v.string(),
-    secret: v.string(),
-    webhookId: v.optional(v.string()),
-    onEvent: v.optional(v.string()),
-    testedAt: v.optional(v.number()),
-  }).index("by_token", ["token"]),
+  endpoints: defineTable(endpointFields).index("by_token", ["token"]),
+  events: defineTable(eventFields)
+    .index("by_stream_event", ["streamEventId"])
+    .index("by_occurred", ["occurredAt"])
+    .index("by_type", ["eventType", "occurredAt"])
+    .index("by_monitor", ["monitorId", "occurredAt"]),
+  jobs: defineTable(jobFields).index("by_status", ["status"]).index("by_key", ["key", "status"]),
   nonces: defineTable({
     endpointId: v.id("endpoints"),
-    nonce: v.string(),
     expiresAt: v.number(),
+    nonce: v.string(),
   })
     .index("by_nonce", ["endpointId", "nonce"])
     .index("by_expiry", ["expiresAt"]),
@@ -28,23 +44,6 @@ export default defineSchema({
     endpointId: v.id("endpoints"),
     streamEventId: v.string(),
   }).index("by_event", ["endpointId", "streamEventId"]),
-  events: defineTable(eventFields)
-    .index("by_stream_event", ["streamEventId"])
-    .index("by_occurred", ["occurredAt"])
-    .index("by_type", ["eventType", "occurredAt"])
-    .index("by_monitor", ["monitorId", "occurredAt"]),
-  jobs: defineTable({
-    key: v.optional(v.string()),
-    operation: v.string(),
-    args: v.record(v.string(), json),
-    everyMs: v.optional(v.number()),
-    status: jobStatus,
-    attempts: v.number(),
-    runs: v.number(),
-    scheduledId: v.optional(v.id("_scheduled_functions")),
-    result: v.optional(json),
-    error: v.optional(json),
-  })
-    .index("by_status", ["status"])
-    .index("by_key", ["key", "status"]),
 });
+
+export { jobStatus };

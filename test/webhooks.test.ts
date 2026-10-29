@@ -1,339 +1,264 @@
-import type { TestConvex } from "convex-test";
-import type schema from "../src/component/schema.js";
-import { afterEach, describe, expect, test, vi } from "vitest";
-import { api, internal } from "../src/component/_generated/api.js";
-import crons from "../src/component/crons.js";
-import { check, pulledEvents, readDelivery } from "../src/component/delivery.js";
-import {
-  componentTest,
-  delivery,
-  rejection,
-  sign,
-  SECRET,
-  SITE,
-  stubFetch,
-  TEST_ALERT,
-  type Signed,
-} from "./helpers.js";
+import { api, internal } from "#src/component/_generated/api.ts";
+import { componentTest, delivery, rejection, SECRET, sign, SITE, TEST_ALERT } from "./helpers.js";
+import { describe, expect, it, vi } from "vitest";
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
-  vi.useRealTimers();
-});
+const OK = 200;
+const BAD_REQUEST = 400;
+const UNAUTHORIZED = 401;
+const NOT_FOUND = 404;
+const NONE = 0;
+const SECOND_MS = 1000;
+const MOMENT_MS = 1;
+const FIVE_MINUTES_MS = 300_000;
+const TEN_MINUTES_MS = 600_000;
+const SECRET_BYTES = 32;
+const SCAN = 10;
+const BATCH = 256;
+const EXPIRED_NONCES = 257;
+const OTHER_SECRET = "cd".repeat(SECRET_BYTES);
+const PAGE = { paginationOpts: { cursor: null, numItems: 10 } };
 
-async function setup(): Promise<{
-  t: TestConvex<typeof schema>;
-  post: (signed: Signed) => Promise<[number, string]>;
-  endpointId: string;
-}> {
-  const t = componentTest();
-  const { endpointId, url } = await t.mutation(api.webhooks.add, { secret: SECRET });
-  const path = new URL(url).pathname.replace("/xquik", "");
-  const post = async (signed: Signed): Promise<[number, string]> => {
-    const response = await t.fetch(path, { method: "POST", ...signed });
-    return [response.status, await response.text()];
-  };
-  return { t, post, endpointId };
+type Backend = ReturnType<typeof componentTest>;
+
+interface Delivered {
+  readonly body: string;
+  readonly headers: Readonly<Record<string, string>>;
 }
 
-const PAGE = { paginationOpts: { numItems: 10, cursor: null } };
+type Post = (signed: Delivered) => Promise<[number, string]>;
 
-describe("the webhook receiver", () => {
-  test("gives each endpoint its own URL and never lists the secret", async () => {
-    const { t, endpointId } = await setup();
-    const { page: listed } = await t.query(api.webhooks.list, PAGE);
-    expect(listed).toHaveLength(1);
-    expect(listed[0]?.endpointId).toBe(endpointId);
-    expect(listed[0]?.url.startsWith(`${SITE}/webhooks/`)).toBe(true);
+function pathOf(url: string): string {
+  return new URL(url).pathname.replace("/xquik", "");
+}
+
+function posted(signed: Delivered): RequestInit {
+  return { body: signed.body, headers: signed.headers, method: "POST" };
+}
+
+async function withFakeTimers<Result>(work: () => Promise<Result>): Promise<Result> {
+  vi.useFakeTimers();
+  try {
+    return await work();
+  } finally {
+    vi.useRealTimers();
+  }
+}
+
+async function setup(): Promise<{ backend: Backend; endpointId: string; post: Post; url: string }> {
+  const backend = componentTest();
+  const { endpointId, url } = await backend.mutation(api.webhooks.add, { secret: SECRET });
+  const path = pathOf(url);
+  const post = async (signed: Delivered): Promise<[number, string]> => {
+    const response = await backend.fetch(path, posted(signed));
+    return [response.status, await response.text()];
+  };
+  return { backend, endpointId, post, url };
+}
+
+describe("the webhook receiver endpoints", () => {
+  it("gives each endpoint its own URL and never lists the secret", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const { backend, endpointId, url } = await setup();
+    const { page: listed } = await backend.query(api.webhooks.list, PAGE);
+    expect(listed).toStrictEqual([{ endpointId, testedAt: null, url, webhookId: null }]);
+    expect(url.startsWith(`${SITE}/webhooks/`)).toBe(true);
     expect(JSON.stringify(listed)).not.toContain(SECRET);
-    expect([listed[0]?.webhookId, listed[0]?.testedAt]).toEqual([null, null]);
   });
 
-  test("pages through endpoints from the newest", async () => {
-    const { t, endpointId: oldest } = await setup();
-    const { endpointId: middle } = await t.mutation(api.webhooks.add, { secret: SECRET });
-    const { endpointId: newest } = await t.mutation(api.webhooks.add, { secret: SECRET });
-    const first = await t.query(api.webhooks.list, { paginationOpts: { numItems: 2, cursor: null } });
-    const rest = await t.query(api.webhooks.list, { paginationOpts: { numItems: 2, cursor: first.continueCursor } });
-    expect([first.page.map((endpoint) => endpoint.endpointId), first.isDone]).toEqual([[newest, middle], false]);
-    expect([rest.page.map((endpoint) => endpoint.endpointId), rest.isDone]).toEqual([[oldest], true]);
+  it("pages through endpoints from the newest", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const { backend, endpointId: oldest } = await setup();
+    const { endpointId: middle } = await backend.mutation(api.webhooks.add, { secret: SECRET });
+    const { endpointId: newest } = await backend.mutation(api.webhooks.add, { secret: SECRET });
+    const first = await backend.query(api.webhooks.list, { paginationOpts: { cursor: null, numItems: 2 } });
+    const rest = await backend.query(api.webhooks.list, {
+      paginationOpts: { cursor: first.continueCursor, numItems: 2 },
+    });
+    expect([first.page.map((endpoint) => endpoint.endpointId), first.isDone]).toStrictEqual([[newest, middle], false]);
+    expect([rest.page.map((endpoint) => endpoint.endpointId), rest.isDone]).toStrictEqual([[oldest], true]);
   });
 
-  test("records the test alert on the endpoint", async () => {
-    const { t, post } = await setup();
-    expect(await post(sign(TEST_ALERT))).toEqual([200, "test"]);
-    const [endpoint] = (await t.query(api.webhooks.list, PAGE)).page;
-    expect(endpoint?.testedAt).toBeTypeOf("number");
+  it("records the test alert on the endpoint", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const { backend, post } = await setup();
+    await expect(post(sign(TEST_ALERT))).resolves.toStrictEqual([OK, "test"]);
+    const { page } = await backend.query(api.webhooks.list, PAGE);
+    expect(page.map((endpoint) => typeof endpoint.testedAt)).toStrictEqual(["number"]);
   });
+});
 
-  test("stores a retry once although it carries a new nonce and signature", async () => {
-    const { t, post } = await setup();
-    expect(await post(sign(delivery("tweet.new", "1")))).toEqual([200, "stored"]);
-    expect(await post(sign(delivery("tweet.new", "1")))).toEqual([200, "duplicate"]);
-    const page = await t.query(api.events.list, { paginationOpts: { numItems: 10, cursor: null } });
-    expect(page.page).toHaveLength(1);
-  });
-
-  test("rejects a replayed nonce, also after a purge", async () => {
-    const { t, post } = await setup();
-    const signed = sign(delivery("tweet.new", "1"));
-    expect(await post(signed)).toEqual([200, "stored"]);
-    expect(await post(signed)).toEqual([401, "replayed nonce"]);
-    expect(await t.mutation(internal.webhooks.purge, {})).toBe(0);
-    expect(await post(signed)).toEqual([401, "replayed nonce"]);
-  });
-
-  test("rejects a timestamp in seconds or more than 5 minutes off", async () => {
-    const { post } = await setup();
+describe("the webhook receiver deliveries", () => {
+  it("stores a retry once although it carries a new nonce and signature", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const { backend, post } = await setup();
     const body = delivery("tweet.new", "1");
-    expect(await post(sign(body, { timestamp: String(Math.floor(Date.now() / 1000)) }))).toEqual([
-      401,
-      "stale timestamp",
-    ]);
-    expect(await post(sign(body, { timestamp: String(Date.now() - 300_000 - 1000) }))).toEqual([
-      401,
-      "stale timestamp",
-    ]);
-    expect(await post(sign(body, { timestamp: String(Date.now() + 300_000 + 1000) }))).toEqual([
-      401,
-      "stale timestamp",
-    ]);
-    expect(await post(sign(body, { timestamp: "17e11" }))).toEqual([401, "stale timestamp"]);
+    await expect(post(sign(body))).resolves.toStrictEqual([OK, "stored"]);
+    await expect(post(sign(body))).resolves.toStrictEqual([OK, "duplicate"]);
+    const { page } = await backend.query(api.events.list, PAGE);
+    expect(page.map((event) => event.streamEventId)).toStrictEqual(["1"]);
   });
 
-  test("rejects a changed body, a wrong secret and malformed headers", async () => {
+  it("rejects a replayed nonce, also after a purge", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const { backend, post } = await setup();
+    const signed = sign(delivery("tweet.new", "1"));
+    await expect(post(signed)).resolves.toStrictEqual([OK, "stored"]);
+    await expect(post(signed)).resolves.toStrictEqual([UNAUTHORIZED, "replayed nonce"]);
+    await expect(backend.mutation(internal.webhooks.purge, {})).resolves.toBe(NONE);
+    await expect(post(signed)).resolves.toStrictEqual([UNAUTHORIZED, "replayed nonce"]);
+  });
+
+  it("rejects a timestamp in seconds or more than 5 minutes off", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const { post } = await setup();
+    const now = Date.now();
+    const body = delivery("tweet.new", "1");
+    const late = now - FIVE_MINUTES_MS - SECOND_MS;
+    const early = now + FIVE_MINUTES_MS + SECOND_MS;
+    const timestamps = [String(Math.floor(now / SECOND_MS)), String(late), String(early), "17e11"];
+    const signed = timestamps.map((timestamp) => sign(body, { timestamp }));
+    const answers = await Promise.all(signed.map(async (request) => await post(request)));
+    expect(answers).toStrictEqual(timestamps.map(() => [UNAUTHORIZED, "stale timestamp"]));
+  });
+});
+
+describe("the webhook receiver signatures", () => {
+  it("rejects a changed body, a wrong secret and malformed headers", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
     const { post } = await setup();
     const signed = sign(delivery("tweet.new", "1"));
-    expect(await post({ ...signed, body: ` ${signed.body}` })).toEqual([401, "bad signature"]);
-    expect(await post(sign(signed.body, { secret: "cd".repeat(32) }))).toEqual([401, "bad signature"]);
-    expect(await post(sign(signed.body, { nonce: "short" }))).toEqual([401, "bad signature"]);
+    const bad = [UNAUTHORIZED, "bad signature"];
     const unsigned = Object.fromEntries(
       Object.entries(signed.headers).filter(([name]) => name !== "x-xquik-signature"),
     );
-    expect(await post({ ...signed, headers: unsigned })).toEqual([401, "bad signature"]);
-    expect(await post({ body: signed.body, headers: {} })).toEqual([401, "stale timestamp"]);
+    await expect(post({ body: ` ${signed.body}`, headers: signed.headers })).resolves.toStrictEqual(bad);
+    await expect(post(sign(signed.body, { secret: OTHER_SECRET }))).resolves.toStrictEqual(bad);
+    await expect(post(sign(signed.body, { nonce: "short" }))).resolves.toStrictEqual(bad);
+    await expect(post({ body: signed.body, headers: unsigned })).resolves.toStrictEqual(bad);
+    await expect(post({ body: signed.body, headers: {} })).resolves.toStrictEqual([UNAUTHORIZED, "stale timestamp"]);
   });
 
-  test("answers 400 to a signed body that is not an Xquik delivery", async () => {
+  it("answers 400 to a signed body that is not an Xquik delivery", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
     const { post } = await setup();
-    expect(await post(sign("not json"))).toEqual([400, "not an Xquik delivery"]);
-    expect(await post(sign(JSON.stringify({ eventType: "tweet.new" })))).toEqual([400, "not an Xquik delivery"]);
-    expect(await post(sign(delivery("tweet.new", "1", { occurredAt: "soon" })))).toEqual([
-      400,
-      "not an Xquik delivery",
-    ]);
-    expect(await post(sign(delivery("tweet.new", "1", { occurredAt: 2026 })))).toEqual([400, "not an Xquik delivery"]);
-    expect(await post(sign(delivery("tweet.new", "1", { streamEventId: 1 })))).toEqual([400, "not an Xquik delivery"]);
-    expect(await post(sign(delivery("tweet.new", "1", { eventType: 1 })))).toEqual([400, "not an Xquik delivery"]);
-    expect(await post(sign("null"))).toEqual([400, "not an Xquik delivery"]);
+    const bodies = [
+      "not json",
+      JSON.stringify({ eventType: "tweet.new" }),
+      delivery("tweet.new", "1", { occurredAt: "soon" }),
+      delivery("tweet.new", "1", { occurredAt: 2026 }),
+      delivery("tweet.new", "1", { streamEventId: 1 }),
+      delivery("tweet.new", "1", { eventType: 1 }),
+      "null",
+    ];
+    const signed = bodies.map((body) => sign(body));
+    const answers = await Promise.all(signed.map(async (request) => await post(request)));
+    expect(answers).toStrictEqual(bodies.map(() => [BAD_REQUEST, "not an Xquik delivery"]));
   });
 
-  test("answers 404 for an unknown URL and refuses other methods", async () => {
-    const { t } = await setup();
-    const response = await t.fetch("/webhooks/unknown", { method: "POST", ...sign(TEST_ALERT) });
-    expect([response.status, response.headers.get("content-type"), await response.text()]).toEqual([
-      404,
-      "text/plain",
-      "unknown webhook URL",
-    ]);
-    expect((await t.fetch("/webhooks/unknown", { method: "GET" })).status).toBe(404);
+  it("answers 404 for an unknown URL and refuses other methods", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const { backend } = await setup();
+    const response = await backend.fetch("/webhooks/unknown", posted(sign(TEST_ALERT)));
+    const answer = [response.status, response.headers.get("content-type"), await response.text()];
+    expect(answer).toStrictEqual([NOT_FOUND, "text/plain", "unknown webhook URL"]);
+    const { status } = await backend.fetch("/webhooks/unknown", { method: "GET" });
+    expect(status).toBe(NOT_FOUND);
   });
+});
 
-  test("schedules the app's handler once per new event", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    const handle = "function://;webhooks:purge";
-    const { url } = await t.mutation(api.webhooks.add, { secret: SECRET, onEvent: handle });
-    const path = new URL(url).pathname.replace("/xquik", "");
-    await t.fetch(path, { method: "POST", ...sign(delivery("tweet.new", "1")) });
-    await t.fetch(path, { method: "POST", ...sign(delivery("tweet.new", "1")) });
-    const scheduled = await t.run(async (ctx) => await ctx.db.system.query("_scheduled_functions").take(10));
-    expect(scheduled.map((job) => JSON.stringify(job)).join()).toContain('"streamEventId":"1"');
-    expect(scheduled).toHaveLength(1);
-  });
-
-  test("runs each endpoint's handler once, even for an event a pull stored first", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    await t.run(async (ctx) => {
-      await ctx.db.insert("events", { streamEventId: "1", eventType: "tweet.new", occurredAt: 1, data: null });
+describe("the webhook receiver handlers", () => {
+  it("schedules the app's handler once per new event", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const scheduled = await withFakeTimers(async () => {
+      const backend = componentTest();
+      const { url } = await backend.mutation(api.webhooks.add, {
+        onEvent: "function://;webhooks:purge",
+        secret: SECRET,
+      });
+      const body = delivery("tweet.new", "1");
+      await backend.fetch(pathOf(url), posted(sign(body)));
+      await backend.fetch(pathOf(url), posted(sign(body)));
+      return await backend.run(async (ctx) => await ctx.db.system.query("_scheduled_functions").take(SCAN));
     });
-    const paths: string[] = [];
-    for (const handle of ["function://;webhooks:purge", "function://;webhooks:list"]) {
-      const { url } = await t.mutation(api.webhooks.add, { secret: SECRET, onEvent: handle });
-      paths.push(new URL(url).pathname.replace("/xquik", ""));
-    }
-    const answers: string[] = [];
-    for (const path of [...paths, ...paths]) {
-      answers.push(await (await t.fetch(path, { method: "POST", ...sign(delivery("tweet.new", "1")) })).text());
-    }
-    expect(answers).toEqual(["stored", "stored", "duplicate", "duplicate"]);
-    const scheduled = await t.run(async (ctx) => await ctx.db.system.query("_scheduled_functions").take(10));
-    expect(scheduled.map((job) => job.name).sort()).toEqual(["webhooks:list", "webhooks:purge"]);
-    const page = await t.query(api.events.list, { paginationOpts: { numItems: 10, cursor: null } });
-    expect(page.page).toHaveLength(1);
+    expect(scheduled.map((job) => JSON.stringify(job)).join(",")).toContain('"streamEventId":"1"');
+    expect(scheduled.map((job) => job.name)).toStrictEqual(["webhooks:purge"]);
   });
 
-  test("stores an event whose endpoint was removed during the delivery", async () => {
-    const t = componentTest();
-    const { endpointId } = await t.mutation(api.webhooks.add, { secret: SECRET });
-    await t.run(async (ctx) => {
+  it("runs each endpoint's handler once, even for an event a pull stored first", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const outcome = await withFakeTimers(async () => {
+      const backend = componentTest();
+      await backend.run(async (ctx) => {
+        await ctx.db.insert("events", { data: null, eventType: "tweet.new", occurredAt: 1, streamEventId: "1" });
+      });
+      const { url: purger } = await backend.mutation(api.webhooks.add, {
+        onEvent: "function://;webhooks:purge",
+        secret: SECRET,
+      });
+      const { url: lister } = await backend.mutation(api.webhooks.add, {
+        onEvent: "function://;webhooks:list",
+        secret: SECRET,
+      });
+      const body = delivery("tweet.new", "1");
+      const deliver = async (url: string): Promise<string> => {
+        const response = await backend.fetch(pathOf(url), posted(sign(body)));
+        return await response.text();
+      };
+      const answers = [await deliver(purger), await deliver(lister), await deliver(purger), await deliver(lister)];
+      const scheduled = await backend.run(async (ctx) => await ctx.db.system.query("_scheduled_functions").take(SCAN));
+      const { page } = await backend.query(api.events.list, PAGE);
+      return { answers, events: page, scheduled };
+    });
+    expect(outcome.answers).toStrictEqual(["stored", "stored", "duplicate", "duplicate"]);
+    expect(outcome.scheduled.map((job) => job.name).toSorted()).toStrictEqual(["webhooks:list", "webhooks:purge"]);
+    expect(outcome.events.map((event) => event.streamEventId)).toStrictEqual(["1"]);
+  });
+});
+
+describe("the webhook receiver edge cases", () => {
+  it("stores an event whose endpoint was removed during the delivery", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const backend = componentTest();
+    const { endpointId } = await backend.mutation(api.webhooks.add, { secret: SECRET });
+    await backend.run(async (ctx) => {
       await ctx.db.delete("endpoints", endpointId);
     });
-    const event = { streamEventId: "1", eventType: "tweet.new", occurredAt: 1, data: null };
-    expect(await t.mutation(internal.webhooks.ingest, { endpointId, nonce: "n", event })).toBe("stored");
+    const event = { data: null, eventType: "tweet.new", occurredAt: 1, streamEventId: "1" };
+    await expect(backend.mutation(internal.webhooks.ingest, { endpointId, event, nonce: "n" })).resolves.toBe("stored");
   });
 
-  test("refuses an onEvent value that is not a function handle", async () => {
-    const t = componentTest();
-    expect(await rejection(t.mutation(api.webhooks.add, { secret: SECRET, onEvent: "example:onEvent" }))).toEqual({
-      status: 400,
+  it("refuses an onEvent value that is not a function handle", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const backend = componentTest();
+    await expect(
+      rejection(backend.mutation(api.webhooks.add, { onEvent: "example:onEvent", secret: SECRET })),
+    ).resolves.toStrictEqual({
       error: "invalid_handle",
       message: "Pass onEvent as a function handle from createFunctionHandle, or use the Xquik client class.",
+      status: 400,
     });
   });
 
-  test("purges expired nonces in batches until none is left", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    const { endpointId } = await t.mutation(api.webhooks.add, { secret: SECRET });
-    await t.run(async (ctx) => {
-      for (let index = 0; index <= 256; index += 1) {
-        await ctx.db.insert("nonces", { endpointId, nonce: String(index), expiresAt: Date.now() - 1 });
-      }
-      await ctx.db.insert("nonces", { endpointId, nonce: "fresh", expiresAt: Date.now() + 600_000 });
-    });
-    expect(await t.mutation(internal.webhooks.purge, {})).toBe(256);
-    vi.runAllTimers();
-    await t.finishInProgressScheduledFunctions();
-    const left = await t.run(async (ctx) => await ctx.db.query("nonces").take(10));
-    expect(left.map((row) => row.nonce)).toEqual(["fresh"]);
-    const runs = await t.run(async (ctx) => await ctx.db.system.query("_scheduled_functions").take(10));
-    expect(runs.map((run) => run.state.kind)).toEqual(["success"]);
-  });
-});
-
-describe("creating and removing webhooks through Xquik", () => {
-  test("creates the Xquik webhook at the receiver URL and keeps its secret", async () => {
-    const t = componentTest();
-    const recorded = stubFetch(() =>
-      Response.json({ id: "42", secret: SECRET, url: "x", eventTypes: [], createdAt: "" }),
-    );
-    const created = await t.action(api.webhooks.create, { eventTypes: ["tweet.new"] });
-    expect(created.webhookId).toBe("42");
-    expect(JSON.parse(recorded[0]?.body ?? "")).toEqual({ eventTypes: ["tweet.new"], url: created.url });
-    const path = new URL(created.url).pathname.replace("/xquik", "");
-    expect((await t.fetch(path, { method: "POST", ...sign(TEST_ALERT) })).status).toBe(200);
-    const [listed] = (await t.query(api.webhooks.list, PAGE)).page;
-    expect([listed?.endpointId, listed?.url, listed?.webhookId, typeof listed?.testedAt]).toEqual([
-      created.endpointId,
-      created.url,
-      "42",
-      "number",
-    ]);
-    const removal = stubFetch(() => Response.json({ success: true }));
-    await t.action(api.webhooks.remove, { endpointId: created.endpointId });
-    expect(removal.map(({ method, url }) => `${method} ${url.pathname}`)).toEqual(["DELETE /api/v1/webhooks/42"]);
-    expect((await t.query(api.webhooks.list, PAGE)).page).toEqual([]);
-    expect(await t.query(internal.webhooks.webhookOf, { endpointId: created.endpointId })).toBeNull();
-  });
-
-  test("passes a function handle through and rejects an answer without a secret", async () => {
-    const t = componentTest();
-    stubFetch(() => Response.json({ id: "42", secret: SECRET }));
-    const created = await t.action(api.webhooks.create, { eventTypes: ["tweet.new"], onEvent: "function://;x:y" });
-    expect(created.webhookId).toBe("42");
-    for (const answer of [[], { id: "42" }, { secret: SECRET }]) {
-      stubFetch(() => Response.json(answer));
-      expect(await rejection(t.action(api.webhooks.create, { eventTypes: ["tweet.new"] }))).toEqual({
-        status: 502,
-        error: "invalid_response",
-        message: "Xquik returned no webhook ID or secret.",
+  it("purges expired nonces in batches until none is left", { timeout: 5000 }, async () => {
+    expect.hasAssertions();
+    const outcome = await withFakeTimers(async () => {
+      const backend = componentTest();
+      const { endpointId } = await backend.mutation(api.webhooks.add, { secret: SECRET });
+      await backend.run(async (ctx) => {
+        const expiresAt = Date.now() - MOMENT_MS;
+        const nonces = Array.from({ length: EXPIRED_NONCES }, (_item, index) => String(index));
+        await Promise.all(nonces.map(async (nonce) => await ctx.db.insert("nonces", { endpointId, expiresAt, nonce })));
+        await ctx.db.insert("nonces", { endpointId, expiresAt: Date.now() + TEN_MINUTES_MS, nonce: "fresh" });
       });
-    }
-  });
-
-  test("removes an endpoint added by secret without calling Xquik", async () => {
-    const t = componentTest();
-    const recorded = stubFetch(() => Response.json({}));
-    const { endpointId } = await t.mutation(api.webhooks.add, { secret: SECRET });
-    await t.action(api.webhooks.remove, { endpointId });
-    expect(recorded).toHaveLength(0);
-  });
-});
-
-describe("delivery parsing", () => {
-  test("check accepts only a matching HMAC over the raw bytes", async () => {
-    const signed = sign("{}");
-    const body = new TextEncoder().encode(signed.body).buffer;
-    expect(await check(SECRET, new Headers(signed.headers), body, Date.now())).toEqual({
-      ok: true,
-      nonce: signed.headers["x-xquik-nonce"],
+      const purged = await backend.mutation(internal.webhooks.purge, {});
+      vi.runAllTimers();
+      await backend.finishInProgressScheduledFunctions();
+      const left = await backend.run(async (ctx) => await ctx.db.query("nonces").take(SCAN));
+      const runs = await backend.run(async (ctx) => await ctx.db.system.query("_scheduled_functions").take(SCAN));
+      return { left, purged, runs };
     });
-  });
-
-  test("check accepts a timestamp up to 5 minutes off", async () => {
-    const now = Date.parse("2026-10-28T19:00:00.000Z");
-    const body = new TextEncoder().encode("{}").buffer;
-    const at = async (timestamp: number): Promise<unknown> =>
-      await check(SECRET, new Headers(sign("{}", { timestamp: String(timestamp) }).headers), body, now);
-    expect(await at(now - 300_000)).toMatchObject({ ok: true });
-    expect(await at(now + 300_000)).toMatchObject({ ok: true });
-    expect(await at(now - 300_001)).toEqual({ ok: false, reason: "stale timestamp" });
-  });
-
-  test("check refuses headers with extra characters around a valid value", async () => {
-    const now = Date.now();
-    const body = new TextEncoder().encode("{}").buffer;
-    const nonce = "ab".repeat(16);
-    const verdict = async (signed: Signed): Promise<unknown> =>
-      await check(SECRET, new Headers(signed.headers), body, now);
-    expect(await verdict(sign("{}", { timestamp: `x${String(now)}` }))).toEqual({
-      ok: false,
-      reason: "stale timestamp",
-    });
-    expect(await verdict(sign("{}", { timestamp: `${String(now)}x` }))).toEqual({
-      ok: false,
-      reason: "stale timestamp",
-    });
-    expect(await verdict(sign("{}", { nonce: `x${nonce}` }))).toEqual({ ok: false, reason: "bad signature" });
-    expect(await verdict(sign("{}", { nonce: `${nonce}x` }))).toEqual({ ok: false, reason: "bad signature" });
-    const signed = sign("{}");
-    const signature = signed.headers["x-xquik-signature"] ?? "";
-    for (const changed of [`x${signature}`, `${signature}0`]) {
-      const headers = { ...signed.headers, "x-xquik-signature": changed };
-      expect(await verdict({ ...signed, headers })).toEqual({ ok: false, reason: "bad signature" });
-    }
-  });
-
-  test("check keeps the signing secret in a key that cannot be exported", async () => {
-    const importKey = vi.spyOn(crypto.subtle, "importKey");
-    const signed = sign("{}");
-    await check(SECRET, new Headers(signed.headers), new TextEncoder().encode(signed.body).buffer, Date.now());
-    expect(importKey).toHaveBeenCalledExactlyOnceWith("raw", expect.anything(), expect.anything(), false, ["verify"]);
-    importKey.mockRestore();
-  });
-
-  test("readDelivery keeps the event fields the component stores", () => {
-    expect(readDelivery(delivery("tweet.new", "5", { monitorId: 10 }))).toEqual({
-      kind: "event",
-      event: {
-        streamEventId: "5",
-        eventType: "tweet.new",
-        occurredAt: Date.parse("2026-10-28T19:00:00.000Z"),
-        data: { id: "1893456789012345678", text: "The future is now." },
-      },
-    });
-    expect(readDelivery("[]")).toBeNull();
-  });
-
-  test("pulledEvents reads the events list of a listEvents answer", () => {
-    expect(pulledEvents(null)).toEqual([]);
-    expect(pulledEvents({ events: 5 })).toEqual([]);
-  });
-
-  test("the cron purges expired nonces every 10 minutes", () => {
-    expect(crons.crons["purge expired webhook nonces"]?.schedule).toEqual({ type: "interval", minutes: 10 });
+    expect(outcome.purged).toBe(BATCH);
+    expect(outcome.left.map((row) => row.nonce)).toStrictEqual(["fresh"]);
+    expect(outcome.runs.map((run) => run.state.kind)).toStrictEqual(["success"]);
   });
 });

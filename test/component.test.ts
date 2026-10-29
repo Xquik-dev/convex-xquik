@@ -1,11 +1,15 @@
-import { expect, test } from "vitest";
-import component from "../src/component/convex.config.js";
+import { assert, describe, expect, it } from "vitest";
+import component from "#src/component/convex.config.ts";
 
-test("the component is named xquik and takes an optional XQUIK_API_KEY", () => {
-  const analyze: unknown = Reflect.get(component, "export");
-  const exported: unknown = typeof analyze === "function" ? Reflect.apply(analyze, component, []) : null;
-  expect(exported).toMatchObject({
-    name: "xquik",
-    envVars: [["XQUIK_API_KEY", { type: "value", value: JSON.stringify({ type: "string" }), optional: true }]],
+describe("the component definition", () => {
+  it("is named xquik and takes an optional XQUIK_API_KEY", { timeout: 5000 }, () => {
+    expect.hasAssertions();
+    const analyze: unknown = Reflect.get(component, "export");
+    assert(typeof analyze === "function");
+    const exported: unknown = Reflect.apply(analyze, component, []);
+    expect(exported).toMatchObject({
+      envVars: [["XQUIK_API_KEY", { optional: true, type: "value", value: JSON.stringify({ type: "string" }) }]],
+      name: "xquik",
+    });
   });
 });

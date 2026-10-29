@@ -169,6 +169,13 @@ lint_code() {
   npx eslint --max-warnings 0 "${files[@]}"
 }
 
+lint_oxlint() {
+  local listing files=()
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js')" || return
+  mapfile -t files <<<"${listing}"
+  npx oxlint --type-aware --type-check --deny-warnings --format=unix "${files[@]}"
+}
+
 type_coverage() {
   local listing files=()
   listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js')" || return
@@ -261,6 +268,7 @@ run_check "format" "Format check of the TypeScript, JavaScript and Markdown file
   "Run npx prettier --write on the files listed above." format_check
 run_check "types" "Type check" "Fix the type errors above." npx tsc --noEmit --project tsconfig.json
 run_check "lint" "Type-aware lint with every Convex rule" "Fix the lint findings above." lint_code
+run_check "oxlint" "Type-aware oxlint with every rule of 13 plugins" "Fix the oxlint findings above." lint_oxlint
 run_check "100% typed" "Type coverage" "Give each value listed above a type without any." type_coverage
 run_check "audit" "Dependency audit and registry signatures" "Upgrade each package named above, then rerun." \
   audit_dependencies

@@ -1,32 +1,36 @@
-import { createHmac, randomBytes } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { convexTest, type TestConvex } from "convex-test";
-import { ConvexError, type Value } from "convex/values";
+import { ConvexError } from "convex/values";
+import { convexTest } from "convex-test";
+import { createHmac } from "node:crypto";
+import schema from "#src/component/schema.ts";
+import spec from "#openapi.json" with { type: "json" };
+import type { TestConvex } from "convex-test";
+import type { Value } from "convex/values";
 import { vi } from "vitest";
-import schema from "../src/component/schema.js";
 
-export const modules = import.meta.glob("../src/component/**/*.ts");
+const SECRET_BYTES = 32;
 
-export const SECRET = "ab".repeat(32);
-export const SITE = "https://happy-otter-123.convex.site/xquik";
+const modules = import.meta.glob("#src/component/**/*.ts");
 
-export function componentTest(): TestConvex<typeof schema> {
+const SECRET = "ab".repeat(SECRET_BYTES);
+const SITE = "https://happy-otter-123.convex.site/xquik";
+
+function componentTest(): TestConvex<typeof schema> {
   vi.stubEnv("XQUIK_API_KEY", "xq_test");
   vi.stubEnv("CONVEX_SITE_URL", SITE);
   return convexTest(schema, modules);
 }
 
-export interface Signed {
+interface Signed {
   readonly headers: Record<string, string>;
   readonly body: string;
 }
 
-export function sign(
+function sign(
   body: string,
   options: { readonly secret?: string; readonly timestamp?: string; readonly nonce?: string } = {},
 ): Signed {
   const timestamp = options.timestamp ?? String(Date.now());
-  const nonce = options.nonce ?? randomBytes(16).toString("hex");
+  const nonce = options.nonce ?? crypto.randomUUID().replaceAll("-", "");
   const mac = createHmac("sha256", options.secret ?? SECRET)
     .update(`${timestamp}.${nonce}.${body}`)
     .digest("hex");
@@ -34,59 +38,66 @@ export function sign(
     body,
     headers: {
       "content-type": "application/json",
-      "x-xquik-timestamp": timestamp,
       "x-xquik-nonce": nonce,
       "x-xquik-signature": `sha256=${mac}`,
+      "x-xquik-timestamp": timestamp,
     },
   };
 }
 
-export function delivery(eventType: string, streamEventId: string, extra: Record<string, unknown> = {}): string {
-  return JSON.stringify({
-    eventType,
-    schemaVersion: 1,
+function delivery(eventType: string, streamEventId: string, extra: Readonly<Record<string, unknown>> = {}): string {
+  const fields = {
+    data: { id: "1893456789012345678", text: "The future is now." },
     deliveryId: `d${streamEventId}`,
-    streamEventId,
-    occurredAt: "2026-10-28T19:00:00.000Z",
+    eventType,
     monitorId: "10",
     monitorType: "account",
+    occurredAt: "2026-10-28T19:00:00.000Z",
+    schemaVersion: 1,
+    streamEventId,
     username: "elonmusk",
     xUserId: "44196397",
-    data: { id: "1893456789012345678", text: "The future is now." },
-    ...extra,
-  });
+  };
+  return JSON.stringify(Object.assign(fields, extra));
 }
 
-export const TEST_ALERT = JSON.stringify({
+const TEST_ALERT = JSON.stringify({
   data: { message: "Test delivery from Xquik" },
   eventType: "webhook.test",
   timestamp: "2026-10-28T19:00:00.000Z",
 });
 
-export interface Recorded {
+interface Recorded {
   readonly method: string;
-  readonly url: URL;
-  readonly headers: Headers;
+  readonly url: Readonly<Omit<URL, "searchParams">> & { readonly searchParams: Readonly<URLSearchParams> };
+  readonly headers: Readonly<Headers>;
   readonly body: string;
 }
 
-export function stubFetch(answer: (request: Recorded) => Response | Promise<Response>): Recorded[] {
+function textBody(body: unknown): string {
+  if (typeof body === "string") {
+    return body;
+  }
+  return "";
+}
+
+function stubFetch(answer: (request: Recorded) => Response | Promise<Response>): Recorded[] {
   const recorded: Recorded[] = [];
-  vi.stubGlobal("fetch", async (input: URL | string, init: RequestInit = {}): Promise<Response> => {
+  const fakeFetch: typeof fetch = async (input, init = {}) => {
     const request = {
-      method: init.method ?? "GET",
-      url: new URL(input),
+      body: textBody(init.body),
       headers: new Headers(init.headers),
-      body: typeof init.body === "string" ? init.body : "",
+      method: init.method ?? "GET",
+      url: new URL(new Request(input).url),
     };
     recorded.push(request);
     return await answer(request);
-  });
+  };
+  vi.stubGlobal("fetch", fakeFetch);
   return recorded;
 }
 
-export function readSpec(): unknown {
-  const spec: unknown = JSON.parse(readFileSync(new URL("../openapi.json", import.meta.url), "utf8"));
+function readSpec(): unknown {
   return spec;
 }
 
@@ -94,9 +105,16 @@ function isConvexError(error: unknown): error is ConvexError<Value> {
   return error instanceof ConvexError;
 }
 
-export async function rejection(promise: Promise<unknown>): Promise<unknown> {
-  return await promise.then(
-    () => "resolved",
-    (error: unknown) => (isConvexError(error) ? error.data : error),
-  );
+function rejectionValue(error: unknown): unknown {
+  if (isConvexError(error)) {
+    return error.data;
+  }
+  return error;
 }
+
+async function rejection(promise: Readonly<Promise<unknown>>): Promise<unknown> {
+  return await promise.then(() => "resolved", rejectionValue);
+}
+
+export { componentTest, delivery, modules, readSpec, rejection, SECRET, sign, SITE, stubFetch, TEST_ALERT };
+export type { Recorded, Signed };

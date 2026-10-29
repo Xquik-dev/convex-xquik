@@ -1,306 +1,299 @@
-import { ConvexError } from "convex/values";
-import type { TestConvex } from "convex-test";
-import type schema from "../src/component/schema.js";
-import { afterEach, describe, expect, test, vi } from "vitest";
-import { api, internal } from "../src/component/_generated/api.js";
-import { failed, plan } from "../src/component/jobs.js";
-import { find } from "../src/component/request.js";
-import { componentTest, rejection, stubFetch } from "./helpers.js";
+import { api, internal } from "#src/component/_generated/api.ts";
+import { componentTest, stubFetch } from "./helpers.js";
+import { describe, expect, it, vi } from "vitest";
 
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.unstubAllEnvs();
-  vi.useRealTimers();
-});
+const NO_DELAY_MS = 0;
+const NO_REQUESTS = 0;
+const ONE_REQUEST = 1;
+const ALL_ATTEMPTS = 5;
+const THREE_JOBS = 3;
+const FOUR_JOBS = 4;
+const PAGE = { cursor: null, numItems: 10 };
+const KEYED = { args: { id: "elonmusk" }, key: "profile", operation: "getUser" };
+const STOPPED = {
+  error: { message: "The job stopped before it finished, so this call replaced it." },
+  status: "failed",
+};
+const EVENT = {
+  data: { id: "1" },
+  id: "7",
+  monitorId: "10",
+  monitorType: "account",
+  occurredAt: "2026-10-28T19:00:00.000Z",
+  type: "tweet.new",
+};
+const LATER = {
+  data: { id: "2" },
+  id: "9",
+  monitorId: "10",
+  monitorType: "account",
+  occurredAt: "2026-10-28T20:00:00.000Z",
+  type: "tweet.new",
+};
+const UNDATED = {
+  data: { id: "1" },
+  id: "8",
+  monitorId: "10",
+  monitorType: "account",
+  occurredAt: "soon",
+  type: "tweet.new",
+};
+const EXTRACTION = {
+  id: "1",
+  pollAfterMs: 1000,
+  status: "pending",
+  statusUrl: "https://xquik.com/api/v1/extractions/1",
+  toolType: "reply_extractor",
+  waitUrl: "https://xquik.com/api/v1/extractions/1/wait",
+};
+const WRITE = { args: { targetTweetId: "1", toolType: "reply_extractor" }, operation: "createExtraction" };
 
-async function settle(t: TestConvex<typeof schema>): Promise<void> {
-  await t.finishInProgressScheduledFunctions();
+async function faked<Result>(body: () => Promise<Result>): Promise<Result> {
+  vi.useFakeTimers();
+  try {
+    return await body();
+  } finally {
+    vi.useRealTimers();
+  }
 }
 
-describe("jobs", () => {
-  test("runs a scheduled read once and keeps its result", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    stubFetch(() => Response.json({ id: "44196397", username: "elonmusk", name: "Elon Musk", extra: 1 }));
-    const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "elonmusk" } });
-    vi.runAllTimers();
-    await settle(t);
-    expect(await t.query(api.jobs.get, { jobId })).toMatchObject({
-      status: "succeeded",
-      runs: 1,
+describe("job runs", () => {
+  it("runs a scheduled read once and keeps its result", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const job = await faked(async () => {
+      const convex = componentTest();
+      stubFetch(() => Response.json({ extra: 1, id: "44196397", name: "Elon Musk", username: "elonmusk" }));
+      const jobId = await convex.mutation(api.jobs.enqueue, { args: { id: "elonmusk" }, operation: "getUser" });
+      vi.runAllTimers();
+      await convex.finishInProgressScheduledFunctions();
+      return await convex.query(api.jobs.get, { jobId });
+    });
+    expect(job).toMatchObject({
       attempts: 0,
-      result: { id: "44196397", username: "elonmusk", name: "Elon Musk" },
+      result: { id: "44196397", name: "Elon Musk", username: "elonmusk" },
+      runs: 1,
+      status: "succeeded",
     });
   });
 
-  test("fails a job at once when its answer breaks the result schema", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    const recorded = stubFetch(() => Response.json({ id: "11348282", username: "NASA", name: 5 }));
-    const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "NASA" } });
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      vi.runOnlyPendingTimers();
-      await settle(t);
-    }
-    expect(recorded).toHaveLength(1);
-    expect(await t.query(api.jobs.get, { jobId })).toMatchObject({
+  it("retries a failed read with backoff, then gives up", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    const recorded = stubFetch(() => Response.json({ error: "busy" }, { status: 503 }));
+    const jobId = await faked(async () => {
+      const id = await convex.mutation(api.jobs.enqueue, { args: { id: "elonmusk" }, operation: "getUser" });
+      await convex.finishAllScheduledFunctions(() => {
+        vi.runAllTimers();
+      });
+      return id;
+    });
+    expect(recorded).toHaveLength(ALL_ATTEMPTS);
+    await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({
+      error: { status: 503 },
+      runs: 1,
       status: "failed",
+    });
+  });
+});
+
+describe("job results", () => {
+  it("fails a job at once when its answer breaks the result schema", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    const recorded = stubFetch(() => Response.json({ id: "11348282", name: 5, username: "NASA" }));
+    const jobId = await faked(async () => {
+      const id = await convex.mutation(api.jobs.enqueue, { args: { id: "NASA" }, operation: "getUser" });
+      await convex.finishAllScheduledFunctions(() => {
+        vi.runAllTimers();
+      });
+      return id;
+    });
+    expect(recorded).toHaveLength(ONE_REQUEST);
+    await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({
       error: {
-        status: 502,
         error: "unexpected_result",
         message: "Xquik answered getUser with a result its schema does not allow.",
+        status: 502,
       },
+      status: "failed",
     });
   });
 
-  test("repeats a pull and stores the events it reads once", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    const event = {
-      id: "7",
-      type: "tweet.new",
-      monitorId: "10",
-      monitorType: "account",
-      occurredAt: "2026-10-28T19:00:00.000Z",
-      data: { id: "1" },
-    };
-    const undated = { ...event, id: "8", occurredAt: "soon" };
-    stubFetch(() => Response.json({ events: [event, event, undated], hasMore: false }));
-    const jobId = await t.mutation(api.jobs.enqueue, { operation: "listEvents", args: {}, everyMs: 60_000 });
-    for (let run = 0; run < 2; run += 1) {
-      vi.runOnlyPendingTimers();
-      await settle(t);
-    }
-    const job = await t.query(api.jobs.get, { jobId });
-    expect(job).toMatchObject({ status: "scheduled", runs: 2 });
-    const page = await t.query(api.events.list, { paginationOpts: { numItems: 10, cursor: null } });
-    expect(page.page.map((row) => row.streamEventId)).toEqual(["7"]);
-    await t.mutation(api.jobs.cancel, { jobId });
-    expect(await t.query(api.jobs.get, { jobId })).toMatchObject({ status: "canceled" });
-    await t.mutation(api.jobs.cancel, { jobId });
-  });
-
-  test("retries a failed read with backoff, then gives up", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    const recorded = stubFetch(() => Response.json({ error: "busy" }, { status: 503 }));
-    const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "elonmusk" } });
-    for (let attempt = 0; attempt < 5; attempt += 1) {
-      vi.runOnlyPendingTimers();
-      await settle(t);
-    }
-    expect(recorded).toHaveLength(5);
-    expect(await t.query(api.jobs.get, { jobId })).toMatchObject({ status: "failed", runs: 1, error: { status: 503 } });
-  });
-
-  test("stores pulled events only from listEvents", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    const event = { id: "7", type: "tweet.new", occurredAt: "2026-10-28T19:00:00.000Z", data: null };
-    const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "elonmusk" } });
-    await t.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: { events: [event] } } });
-    expect(await t.query(api.jobs.get, { jobId })).toMatchObject({ status: "succeeded" });
-    const page = await t.query(api.events.list, { paginationOpts: { numItems: 10, cursor: null } });
-    expect(page.page).toEqual([]);
-  });
-
-  test("retries a write with the same Idempotency-Key", async () => {
-    const extraction = {
-      id: "1",
-      pollAfterMs: 1000,
-      statusUrl: "https://xquik.com/api/v1/extractions/1",
-      waitUrl: "https://xquik.com/api/v1/extractions/1/wait",
-      toolType: "reply_extractor",
-      status: "pending",
-    };
-    vi.useFakeTimers();
-    const t = componentTest();
-    let calls = 0;
-    const recorded = stubFetch(() => {
-      calls += 1;
-      return calls === 1 ? Response.json({ error: "busy" }, { status: 503 }) : Response.json(extraction);
+  it("stores pulled events only from listEvents", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    const event = { data: null, id: "7", occurredAt: "2026-10-28T19:00:00.000Z", type: "tweet.new" };
+    const jobId = await faked(async () => {
+      const id = await convex.mutation(api.jobs.enqueue, { args: { id: "elonmusk" }, operation: "getUser" });
+      await convex.mutation(internal.jobs.finish, { jobId: id, outcome: { ok: true, result: { events: [event] } } });
+      return id;
     });
-    const jobId = await t.mutation(api.jobs.enqueue, {
-      operation: "createExtraction",
-      args: { toolType: "reply_extractor", targetTweetId: "1" },
-    });
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      vi.runOnlyPendingTimers();
-      await settle(t);
-    }
-    expect(recorded.map(({ headers }) => headers.get("idempotency-key"))).toEqual([`${jobId}-0`, `${jobId}-0`]);
-    expect(await t.query(api.jobs.get, { jobId })).toMatchObject({ status: "succeeded", runs: 1, attempts: 0 });
+    await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({ status: "succeeded" });
+    const page = await convex.query(api.events.list, { paginationOpts: PAGE });
+    expect(page.page).toStrictEqual([]);
   });
+});
 
-  test("fills the Idempotency-Key of a write so its retries stay safe", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    const recorded = stubFetch(() => Response.json({ id: "1" }));
-    const jobId = await t.mutation(api.jobs.enqueue, {
-      operation: "createExtraction",
-      args: { toolType: "reply_extractor", targetTweetId: "1" },
-      delayMs: 1000,
+describe("repeating jobs", () => {
+  it("repeats a pull and stores the events it reads once", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    stubFetch(() => Response.json({ events: [EVENT, EVENT, UNDATED, LATER], hasMore: false }));
+    const jobId = await faked(async () => {
+      const id = await convex.mutation(api.jobs.enqueue, { args: {}, everyMs: 60_000, operation: "listEvents" });
+      const tick = async (): Promise<void> => {
+        vi.runOnlyPendingTimers();
+        await convex.finishInProgressScheduledFunctions();
+      };
+      await tick();
+      await tick();
+      return id;
     });
-    vi.runAllTimers();
-    await settle(t);
-    expect(recorded[0]?.headers.get("idempotency-key")).toBe(`${jobId}-0`);
+    await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({ runs: 2, status: "scheduled" });
+    const page = await convex.query(api.events.list, { paginationOpts: PAGE });
+    expect(page.page.map((row) => row.streamEventId)).toStrictEqual(["9", "7"]);
+    await convex.mutation(api.jobs.cancel, { jobId });
+    await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({ status: "canceled" });
+    await expect(convex.mutation(api.jobs.cancel, { jobId })).resolves.toBeNull();
   });
+});
 
-  test("keeps 1 scheduled job per key and starts a new one after a cancel", async () => {
-    const t = componentTest();
-    const first = await t.mutation(api.jobs.enqueue, {
-      operation: "getUser",
-      args: { id: "elonmusk" },
-      key: "profile",
-    });
-    expect(await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "NASA" }, key: "profile" })).toBe(
-      first,
-    );
-    const other = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "NASA" }, key: "other" });
-    await t.mutation(api.jobs.cancel, { jobId: first });
-    const next = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "NASA" }, key: "profile" });
-    expect(new Set([first, other, next]).size).toBe(3);
-  });
-
-  test("returns the running job for its key and replaces a keyed job that stopped", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    const args = { operation: "getUser", args: { id: "elonmusk" }, key: "profile" };
-    const first = await t.mutation(api.jobs.enqueue, args);
-    const during: string[] = [];
-    stubFetch(async () => {
-      during.push(await t.mutation(api.jobs.enqueue, args));
-      return Response.json({ id: "1" });
-    });
-    vi.runAllTimers();
-    await t.finishInProgressScheduledFunctions();
-    expect(during).toEqual([first]);
-    const stuck = await t.run(async (ctx) => {
-      const jobId = await ctx.db.insert("jobs", { ...args, status: "scheduled", attempts: 0, runs: 0 });
-      const scheduledId = await ctx.scheduler.runAfter(0, internal.jobs.run, { jobId });
-      await ctx.scheduler.cancel(scheduledId);
-      await ctx.db.patch("jobs", jobId, { scheduledId });
-      return jobId;
-    });
-    const unscheduled = await t.run(
-      async (ctx) => await ctx.db.insert("jobs", { ...args, key: "other", status: "scheduled", attempts: 0, runs: 0 }),
-    );
-    const replaced = await t.mutation(api.jobs.enqueue, args);
-    const other = await t.mutation(api.jobs.enqueue, { ...args, key: "other" });
-    expect(new Set([stuck, replaced, unscheduled, other]).size).toBe(4);
-    for (const jobId of [stuck, unscheduled]) {
-      expect(await t.query(api.jobs.get, { jobId })).toMatchObject({
-        status: "failed",
-        error: { message: "The job stopped before it finished, so this call replaced it." },
+describe("idempotency keys", () => {
+  it("retries a write with the same Idempotency-Key", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    const answer = vi
+      .fn<() => Response>()
+      .mockReturnValueOnce(Response.json({ error: "busy" }, { status: 503 }))
+      .mockReturnValueOnce(Response.json(EXTRACTION));
+    const recorded = stubFetch(answer);
+    const jobId = await faked(async () => {
+      const id = await convex.mutation(api.jobs.enqueue, WRITE);
+      await convex.finishAllScheduledFunctions(() => {
+        vi.runAllTimers();
       });
-    }
-  });
-
-  test("lists jobs by status and refuses bad input", async () => {
-    const t = componentTest();
-    await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "elonmusk" } });
-    const all = await t.query(api.jobs.list, { paginationOpts: { numItems: 5, cursor: null } });
-    const scheduled = await t.query(api.jobs.list, {
-      paginationOpts: { numItems: 5, cursor: null },
-      status: "scheduled",
+      return id;
     });
-    const failedJobs = await t.query(api.jobs.list, {
-      paginationOpts: { numItems: 5, cursor: null },
-      status: "failed",
-    });
-    expect([all.page.length, scheduled.page.length, failedJobs.page.length]).toEqual([1, 1, 0]);
-    expect(await rejection(t.mutation(api.jobs.enqueue, { operation: "nope", args: {} }))).toEqual({
-      status: 404,
-      error: "unknown_operation",
-      message: "nope is not an Xquik operation.",
-    });
-    expect(await rejection(t.mutation(api.jobs.enqueue, { operation: "getUser", args: {}, everyMs: 1 }))).toEqual({
-      status: 400,
-      error: "interval_too_short",
-      message: "Set everyMs to 60000 or more.",
+    expect(recorded.map(({ headers }) => headers.get("idempotency-key"))).toStrictEqual([`${jobId}-0`, `${jobId}-0`]);
+    await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({
+      attempts: 0,
+      runs: 1,
+      status: "succeeded",
     });
   });
 
-  test("skips a job that is gone or no longer scheduled", async () => {
-    const t = componentTest();
-    const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "elonmusk" } });
-    await t.mutation(api.jobs.cancel, { jobId });
-    const recorded = stubFetch(() => Response.json({}));
-    await t.action(internal.jobs.run, { jobId });
-    await t.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: null } });
-    expect(recorded).toHaveLength(0);
-    expect(await t.query(api.jobs.get, { jobId })).toMatchObject({ status: "canceled", runs: 0 });
-  });
-
-  test("does nothing for a job that no longer exists", async () => {
-    vi.useFakeTimers();
-    const t = componentTest();
-    const jobId = await t.mutation(api.jobs.enqueue, { operation: "getUser", args: { id: "elonmusk" } });
-    await t.run(async (ctx) => {
-      await ctx.db.delete("jobs", jobId);
+  it("fills the Idempotency-Key of a write so its retries stay safe", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    const recorded = stubFetch(() => Response.json({ id: "1" }));
+    const jobId = await faked(async () => {
+      const id = await convex.mutation(api.jobs.enqueue, {
+        args: WRITE.args,
+        delayMs: 1000,
+        operation: WRITE.operation,
+      });
+      vi.runAllTimers();
+      await convex.finishInProgressScheduledFunctions();
+      return id;
     });
-    const recorded = stubFetch(() => Response.json({}));
-    expect(await t.action(internal.jobs.run, { jobId })).toBeNull();
-    expect(await t.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: null } })).toBeNull();
-    expect(await t.mutation(api.jobs.cancel, { jobId })).toBeNull();
-    expect(recorded).toHaveLength(0);
+    expect(recorded.map(({ headers }) => headers.get("idempotency-key"))).toStrictEqual([`${jobId}-0`]);
   });
 });
 
-describe("plan", () => {
-  const ok = { ok: true, result: null } as const;
-  const transient = { ok: false, error: null, retryable: true } as const;
-
-  test("retries with exponential backoff or the server's delay", () => {
-    expect(plan({ attempts: 0 }, transient)).toEqual({ status: "scheduled", delayMs: 1000, attempts: 1 });
-    expect(plan({ attempts: 3 }, transient)).toEqual({ status: "scheduled", delayMs: 8000, attempts: 4 });
-    expect(plan({ attempts: 0 }, { ...transient, retryAfterMs: 5 })).toEqual({
-      status: "scheduled",
-      delayMs: 5,
-      attempts: 1,
+describe("job keys", () => {
+  it("keeps 1 scheduled job per key and starts a new one after a cancel", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    const first = await convex.mutation(api.jobs.enqueue, KEYED);
+    await expect(
+      convex.mutation(api.jobs.enqueue, { args: { id: "NASA" }, key: "profile", operation: "getUser" }),
+    ).resolves.toBe(first);
+    const other = await convex.mutation(api.jobs.enqueue, { args: { id: "NASA" }, key: "other", operation: "getUser" });
+    await convex.mutation(api.jobs.cancel, { jobId: first });
+    const next = await convex.mutation(api.jobs.enqueue, {
+      args: { id: "NASA" },
+      key: "profile",
+      operation: "getUser",
     });
+    expect(new Set([first, other, next]).size).toBe(THREE_JOBS);
   });
 
-  test("stops at the last attempt or a permanent error", () => {
-    expect(plan({ attempts: 4 }, transient)).toEqual({ status: "failed", delayMs: null, attempts: 0 });
-    expect(plan({ attempts: 0 }, { ...transient, retryable: false })).toEqual({
-      status: "failed",
-      delayMs: null,
-      attempts: 0,
+  it("returns the running job for its key", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    const during: string[] = [];
+    const first = await faked(async () => {
+      const id = await convex.mutation(api.jobs.enqueue, KEYED);
+      stubFetch(async () => {
+        during.push(await convex.mutation(api.jobs.enqueue, KEYED));
+        return Response.json({ id: "1" });
+      });
+      vi.runAllTimers();
+      await convex.finishInProgressScheduledFunctions();
+      return id;
     });
-    expect(plan({ attempts: 2 }, ok)).toEqual({ status: "succeeded", delayMs: null, attempts: 0 });
-  });
-
-  test("keeps a repeating job on its interval", () => {
-    expect(plan({ attempts: 4, everyMs: 60_000 }, transient)).toEqual({
-      status: "scheduled",
-      delayMs: 60_000,
-      attempts: 0,
-    });
+    expect(during).toStrictEqual([first]);
   });
 });
 
-describe("failed", () => {
-  const read = find("getUser");
-  const write = find("createDraft");
+describe("stopped jobs", () => {
+  it("replaces a keyed job that stopped", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    const ids = await faked(async () => {
+      const stuck = await convex.run(async (ctx) => {
+        const jobId = await ctx.db.insert("jobs", {
+          args: KEYED.args,
+          attempts: 0,
+          key: "profile",
+          operation: "getUser",
+          runs: 0,
+          status: "scheduled",
+        });
+        const scheduledId = await ctx.scheduler.runAfter(NO_DELAY_MS, internal.jobs.run, { jobId });
+        await ctx.scheduler.cancel(scheduledId);
+        await ctx.db.patch("jobs", jobId, { scheduledId });
+        return jobId;
+      });
+      const unscheduled = await convex.run(
+        async (ctx) =>
+          await ctx.db.insert("jobs", {
+            args: KEYED.args,
+            attempts: 0,
+            key: "other",
+            operation: "getUser",
+            runs: 0,
+            status: "scheduled",
+          }),
+      );
+      const replaced = await convex.mutation(api.jobs.enqueue, KEYED);
+      const other = await convex.mutation(api.jobs.enqueue, { args: KEYED.args, key: "other", operation: "getUser" });
+      return { other, replaced, stuck, unscheduled };
+    });
+    expect(new Set(Object.values(ids)).size).toBe(FOUR_JOBS);
+    await expect(
+      Promise.all([ids.stuck, ids.unscheduled].map(async (jobId) => await convex.query(api.jobs.get, { jobId }))),
+    ).resolves.toMatchObject([STOPPED, STOPPED]);
+  });
+});
 
-  test("retries only safe calls on 429, 5xx and network errors", () => {
-    expect(failed(read, new ConvexError({ status: 429, retryAfter: 2 }))).toEqual({
-      ok: false,
-      error: { status: 429, retryAfter: 2 },
-      retryable: true,
-      retryAfterMs: 2000,
+describe("deleted jobs", () => {
+  it("does nothing for a job that no longer exists", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const convex = componentTest();
+    const jobId = await faked(async () => {
+      const id = await convex.mutation(api.jobs.enqueue, { args: { id: "elonmusk" }, operation: "getUser" });
+      await convex.run(async (ctx) => {
+        await ctx.db.delete("jobs", id);
+      });
+      return id;
     });
-    expect(failed(read, new ConvexError({ status: 500 })).retryable).toBe(true);
-    expect(failed(read, new ConvexError({ status: 404 })).retryable).toBe(false);
-    expect(failed(read, new TypeError("fetch failed"))).toEqual({
-      ok: false,
-      error: { message: "TypeError: fetch failed" },
-      retryable: true,
-    });
-    expect(failed(write, new ConvexError({ status: 503 })).retryable).toBe(false);
-    expect(failed(find("deleteDraft"), new ConvexError({ status: 503 })).retryable).toBe(false);
-    expect(failed(find("createExtraction"), new ConvexError({ status: 503 })).retryable).toBe(true);
-    expect(failed(read, new ConvexError("plain")).retryable).toBe(true);
+    const recorded = stubFetch(() => Response.json({}));
+    await expect(convex.action(internal.jobs.run, { jobId })).resolves.toBeNull();
+    await expect(
+      convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: null } }),
+    ).resolves.toBeNull();
+    await expect(convex.mutation(api.jobs.cancel, { jobId })).resolves.toBeNull();
+    expect(recorded).toHaveLength(NO_REQUESTS);
   });
 });

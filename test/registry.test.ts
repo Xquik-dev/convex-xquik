@@ -1,508 +1,209 @@
-import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { bodyRegistry, json, post, spec } from "./registry-specs.ts";
+import { copyFile, mkdir, mkdtemp, readFile, rm } from "node:fs/promises";
+import { describe, expect, it } from "vitest";
+import { eventTypes, readRegistry, writeGenerated } from "#scripts/registry.ts";
+import { parseRegistry } from "#src/component/shape.ts";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import { describe, expect, test } from "vitest";
-import { eventTypes, readRegistry, writeGenerated } from "../scripts/registry.js";
-import { isShape, parseRegistry } from "../src/component/shape.js";
 
-const root = new URL("..", import.meta.url).pathname;
-
-function spec(paths: Record<string, unknown>, schemas: Record<string, unknown> = {}): unknown {
-  return { security: [{ apiKey: [] }], paths, components: { schemas } };
+interface Generated {
+  readonly ids: readonly string[];
+  readonly operations: readonly string[];
 }
 
-function post(requestBody: unknown, extra: Record<string, unknown> = {}): Record<string, unknown> {
-  return { "/x": { post: { operationId: "make", requestBody, responses: { 201: {} }, ...extra } } };
-}
+const PUBLIC_OPERATIONS = 190;
+const NOT_AN_EVENT = 1;
 
-function json(schema: unknown, required = true): unknown {
-  return { required, content: { "application/json": { schema } } };
-}
+const KEYED_SPEC = {
+  components: { parameters: { Limit: { in: "query", name: "limit", schema: { type: ["integer", "null"] } } } },
+  paths: {
+    "/a/{id}": {
+      delete: { operationId: "dashboardOnly", responses: {}, security: [{ cookieSession: [] }] },
+      get: {
+        operationId: "getA",
+        parameters: [
+          { in: "header", name: "Idempotency-Key", schema: { type: "string" } },
+          { in: "cookie", name: "session", schema: { type: "string" } },
+          { in: "query", schema: { type: "string" } },
+          { in: "query", name: "pageSize", schema: { type: "integer" } },
+          { $ref: "#/components/parameters/Limit" },
+        ],
+        responses: { 200: { content: { "application/octet-stream": {} } } },
+      },
+      parameters: [{ in: "path", name: "id", required: true, schema: { type: "string" } }],
+      put: { responses: {}, security: [{}] },
+    },
+    "/open": {
+      get: { operationId: "open", responses: { 200: { content: { "text/event-stream": {} } } }, security: [{}] },
+    },
+  },
+  security: [{ apiKey: [] }],
+};
 
-function objectSpec(body: unknown): unknown {
-  return {
-    security: [{ apiKey: [] }],
-    paths: post(json(body)),
-    components: {
-      flags: { Flag: { type: "boolean" } },
-      schemas: {
-        Left: {
-          type: "object",
-          required: ["shared", "side"],
-          properties: {
-            shared: { type: "string" },
-            flag: { $ref: "#/components/flags/Flag" },
-            side: { const: "left" },
-          },
-        },
-        Right: {
-          type: "object",
-          required: ["shared", "side"],
-          properties: { shared: { $ref: "#/components/schemas/Left/properties/shared" }, side: { const: "right" } },
+const KEYED_OPERATIONS = {
+  getA: {
+    args: {
+      id: { optional: false, shape: "string" },
+      idempotencyKey: { optional: true, shape: "string" },
+      limit: { optional: true, shape: { union: ["number", "null"] } },
+      pageSize: { optional: true, shape: "number" },
+    },
+    body: null,
+    method: "GET",
+    params: [
+      { in: "path", name: "id", wire: "id" },
+      { in: "header", name: "idempotencyKey", wire: "Idempotency-Key" },
+      { in: "query", name: "pageSize", wire: "pageSize" },
+      { in: "query", name: "limit", wire: "limit" },
+    ],
+    path: "/a/{id}",
+    response: "bytes",
+    result: "bytes",
+  },
+  open: {
+    args: {},
+    body: null,
+    method: "GET",
+    params: [],
+    path: "/open",
+    response: "events",
+    result: {
+      array: {
+        object: {
+          data: { optional: false, shape: "any" },
+          event: { optional: true, shape: "string" },
+          id: { optional: true, shape: "string" },
         },
       },
     },
-  };
+  },
+};
+
+const LOOP_CYCLE = "openapi.json has the reference cycle #/components/schemas/Loop > #/components/schemas/Loop.";
+const LOOP_SCHEMAS = { Done: { type: "string" }, Loop: { $ref: "#/components/schemas/Loop" } };
+const NODE_SCHEMAS = { Node: { properties: { next: { $ref: "#/components/schemas/Node" } } } };
+const DONE_THEN_LOOP = { done: { $ref: "#/components/schemas/Done" }, loop: { $ref: "#/components/schemas/Loop" } };
+
+async function generate(): Promise<Generated> {
+  const work = await mkdtemp(`${tmpdir()}/xquik-convex-`);
+  try {
+    await mkdir(`${work}/src/component`, { recursive: true });
+    await copyFile(new URL("../openapi.json", import.meta.url), `${work}/openapi.json`);
+    await writeGenerated(work);
+    const registry: unknown = JSON.parse(await readFile(`${work}/src/component/registry.json`, "utf8"));
+    const operations = await readFile(`${work}/src/component/operations.ts`, "utf8");
+    return { ids: Object.keys(parseRegistry(registry).operations), operations: operations.split("\n") };
+  } finally {
+    await rm(work, { force: true, recursive: true });
+  }
+}
+
+function ok(schema: unknown): unknown {
+  return { content: { "application/json": { schema } } };
+}
+
+function schemaRef(name: string): unknown {
+  return ok({ $ref: `#/components/schemas/${name}` });
 }
 
 describe("the generator", () => {
-  test("writes the registry and 1 action export per public operation", () => {
-    const work = mkdtempSync(join(tmpdir(), "xquik-convex-"));
-    try {
-      mkdirSync(join(work, "src/component"), { recursive: true });
-      copyFileSync(join(root, "openapi.json"), join(work, "openapi.json"));
-      writeGenerated(work);
-      const registry: unknown = JSON.parse(readFileSync(join(work, "src/component/registry.json"), "utf8"));
-      const ids = Object.keys(parseRegistry(registry).operations);
-      const operations = readFileSync(join(work, "src/component/operations.ts"), "utf8").split("\n");
-      expect(ids).toHaveLength(190);
-      expect(operations).toEqual([
-        'import { operation } from "./operation.js";',
-        "",
-        ...ids.map((id) => `export const ${id} = operation("${id}");`),
-        "",
-      ]);
-    } finally {
-      rmSync(work, { recursive: true, force: true });
-    }
+  it("writes the registry and 1 action export per public operation", { timeout: 10_000 }, async () => {
+    expect.hasAssertions();
+    const { ids, operations } = await generate();
+    const names = ids.map((id) => `  ${id},`);
+    expect(ids).toHaveLength(PUBLIC_OPERATIONS);
+    expect(operations).toStrictEqual([
+      'import { operations } from "./operation.js";',
+      "",
+      "export const {",
+      ...names,
+      "} = operations();",
+      "",
+    ]);
   });
 
-  test("keeps only API key operations and maps headers to camelCase arguments", () => {
-    const registry = readRegistry({
-      security: [{ apiKey: [] }],
-      paths: {
-        "/a/{id}": {
-          parameters: [{ name: "id", in: "path", required: true, schema: { type: "string" } }],
-          get: {
-            operationId: "getA",
-            parameters: [
-              { name: "Idempotency-Key", in: "header", schema: { type: "string" } },
-              { name: "session", in: "cookie", schema: { type: "string" } },
-              { in: "query", schema: { type: "string" } },
-              { name: "pageSize", in: "query", schema: { type: "integer" } },
-              { $ref: "#/components/parameters/Limit" },
-            ],
-            responses: { 200: { content: { "application/octet-stream": {} } } },
-          },
-          delete: { operationId: "dashboardOnly", security: [{ cookieSession: [] }], responses: {} },
-          put: { security: [{}], responses: {} },
-        },
-        "/open": {
-          get: { operationId: "open", security: [{}], responses: { 200: { content: { "text/event-stream": {} } } } },
-        },
-      },
-      components: { parameters: { Limit: { name: "limit", in: "query", schema: { type: ["integer", "null"] } } } },
-    });
-    expect(registry.schemas).toEqual({});
-    expect(registry.operations).toEqual({
-      getA: {
-        method: "GET",
-        path: "/a/{id}",
-        params: [
-          { name: "id", in: "path", wire: "id" },
-          { name: "idempotencyKey", in: "header", wire: "Idempotency-Key" },
-          { name: "pageSize", in: "query", wire: "pageSize" },
-          { name: "limit", in: "query", wire: "limit" },
-        ],
-        body: null,
-        response: "bytes",
-        result: "bytes",
-        args: {
-          id: { shape: "string", optional: false },
-          idempotencyKey: { shape: "string", optional: true },
-          pageSize: { shape: "number", optional: true },
-          limit: { shape: { union: ["number", "null"] }, optional: true },
-        },
-      },
-      open: {
-        method: "GET",
-        path: "/open",
-        params: [],
-        body: null,
-        response: "events",
-        result: {
-          array: {
-            object: {
-              id: { shape: "string", optional: true },
-              event: { shape: "string", optional: true },
-              data: { shape: "any", optional: false },
-            },
-          },
-        },
-        args: {},
-      },
-    });
+  it("keeps only API key operations and maps headers to camelCase arguments", { timeout: 10_000 }, () => {
+    expect.hasAssertions();
+    const registry = readRegistry(KEYED_SPEC);
+    expect(registry.schemas).toStrictEqual({});
+    expect(registry.operations).toStrictEqual(KEYED_OPERATIONS);
   });
 
-  test("turns schemas into shapes", () => {
-    const registry = readRegistry(
-      spec(
-        post(
-          json({
-            type: "object",
-            required: ["kind"],
-            properties: {
-              kind: { const: "a" },
-              level: { enum: [1, "two", null] },
-              tags: { type: "array", items: { $ref: "#/components/schemas/Tag~0x" } },
-              raw: { type: "array" },
-              map: { type: "object", additionalProperties: { type: "boolean" } },
-              free: { type: "object" },
-              both: {
-                allOf: [
-                  { properties: { a: { type: "string" } }, required: ["a"] },
-                  { properties: { a: { type: "string" }, b: { type: "number" } } },
-                ],
-              },
-              either: { anyOf: [{ type: "string" }, { type: "string" }, {}] },
-              nested: { properties: { x: { type: "boolean" } } },
-              choice: { anyOf: [{ enum: ["a", "b"] }, { type: "number" }] },
-              flag: { const: true },
-              none: { enum: [] },
-              mixed: { type: ["string", 5] },
-            },
-          }),
-          { responses: { 200: { content: { "application/json": {} } } } },
-        ),
-        { "Tag~x": { type: "string" } },
-      ),
-    );
-    expect(registry.operations["make"]).toMatchObject({ response: "json", result: "any" });
-    expect(registry.schemas).toEqual({ "Tag~0x": "string" });
-    expect(registry.operations["make"]?.args).toEqual({
-      kind: { shape: { literal: "a" }, optional: false },
-      level: { shape: { union: [{ literal: 1 }, { literal: "two" }, "null"] }, optional: true },
-      tags: { shape: { array: { ref: "Tag~0x" } }, optional: true },
-      raw: { shape: { array: "any" }, optional: true },
-      map: { shape: { record: "boolean" }, optional: true },
-      free: { shape: "any", optional: true },
-      both: {
-        shape: { object: { a: { shape: "string", optional: false }, b: { shape: "number", optional: true } } },
-        optional: true,
-      },
-      either: { shape: "any", optional: true },
-      nested: { shape: { object: { x: { shape: "boolean", optional: true } } }, optional: true },
-      choice: { shape: { union: [{ literal: "a" }, { literal: "b" }, "number"] }, optional: true },
-      flag: { shape: { literal: true }, optional: true },
-      none: { shape: { union: [] }, optional: true },
-      mixed: { shape: "string", optional: true },
-    });
-  });
-
-  test("keeps a field required only where every oneOf body requires it", () => {
-    const registry = readRegistry(
-      spec(
-        post(
-          json({
-            oneOf: [
-              {
-                properties: { step: { const: "a" }, text: { type: "string" }, note: { type: "string" } },
-                required: ["step", "text", "note"],
-              },
-              { properties: { step: { const: "b" }, note: { type: "string" } }, required: ["step"] },
-            ],
-          }),
-          { responses: { 204: {}, 400: { content: { "application/json": {} } } } },
-        ),
-      ),
-    );
-    expect(registry.operations["make"]).toMatchObject({
-      response: "none",
-      result: "null",
-      args: {
-        step: { shape: { union: [{ literal: "a" }, { literal: "b" }] }, optional: false },
-        text: { shape: "string", optional: true },
-        note: { shape: "string", optional: true },
-      },
-    });
-  });
-
-  test("orders operations by ID", () => {
+  it("orders operations by ID", { timeout: 10_000 }, () => {
+    expect.hasAssertions();
     const registry = readRegistry(
       spec({
-        "/b": { get: { operationId: "zeta", responses: {} } },
         "/a": { get: { operationId: "alpha", responses: {} } },
+        "/b": { get: { operationId: "zeta", responses: {} } },
       }),
     );
-    expect(Object.keys(registry.operations)).toEqual(["alpha", "zeta"]);
-  });
-
-  test("merges oneOf bodies into lenient arguments and makes an optional body optional", () => {
-    const registry = readRegistry(
-      spec(
-        post(
-          json(
-            {
-              oneOf: [
-                { properties: { step: { const: "a" }, text: { type: "string" } }, required: ["step", "text"] },
-                { properties: { step: { const: "b" } }, required: ["step"] },
-              ],
-            },
-            false,
-          ),
-        ),
-      ),
-    );
-    expect(registry.operations["make"]).toMatchObject({
-      body: ["step", "text"],
-      response: "none",
-      args: {
-        step: { shape: { union: [{ literal: "a" }, { literal: "b" }] }, optional: true },
-        text: { shape: "string", optional: true },
-      },
-    });
-  });
-
-  test("names each spec problem it cannot turn into arguments", () => {
-    expect(() => readRegistry(spec(post(json({ type: "array" }))))).toThrow(
-      'make has {"array":"any"} where it needs an object.',
-    );
-    expect(() => readRegistry(spec(post(json({ type: "string" }))))).toThrow(
-      'make has "string" where it needs an object.',
-    );
-    expect(() =>
-      readRegistry(
-        spec(post(json({ allOf: [{ $ref: "#/components/schemas/B" }] })), { B: { $ref: "#/components/schemas/B" } }),
-      ),
-    ).toThrow("openapi.json has the reference cycle #/components/schemas/B > #/components/schemas/B.");
-    expect(() =>
-      readRegistry(
-        spec(post(json({ $ref: "#/components/schemas/Node" })), {
-          Node: { properties: { next: { $ref: "#/components/schemas/Node" } } },
-        }),
-      ),
-    ).toThrow("openapi.json has the reference cycle #/components/schemas/Node > #/components/schemas/Node.");
-    expect(() => readRegistry(spec(post(json({ enum: [{}] }))))).toThrow("the enum value {}");
-    expect(() => readRegistry(spec(post(json({ $ref: "#/components/schemas/Missing" }))))).toThrow("broken reference");
-    expect(() =>
-      readRegistry(spec(post(json({ $ref: "#/components/schemas/A" })), { A: { $ref: "#/components/schemas/A" } })),
-    ).toThrow("openapi.json has the reference cycle #/components/schemas/A > #/components/schemas/A.");
-    const clash = post(json({ properties: { id: { type: "string" } } }), {
-      parameters: [{ name: "id", in: "query", schema: { type: "string" } }],
-    });
-    expect(() => readRegistry(spec(clash))).toThrow("make has a parameter and a body field both named id.");
-  });
-
-  test("types each result as the union of its success responses", () => {
-    const ok = (schema: unknown): unknown => ({ content: { "application/json": { schema } } });
-    const ref = (name: string): unknown => ok({ $ref: `#/components/schemas/${name}` });
-    const registry = readRegistry({
-      security: [{ apiKey: [] }],
-      paths: {
-        "/a": {
-          get: { operationId: "both", responses: { 200: ref("Z"), 202: ok({ type: "boolean" }), 400: ref("B") } },
-        },
-        "/b": { get: { operationId: "maybe", responses: { 200: { $ref: "#/components/responses/One" }, 204: {} } } },
-        "/c": { get: { operationId: "same", responses: { 200: ref("A"), 201: ref("A") } } },
-      },
-      components: {
-        schemas: { A: { type: "number" }, B: { type: "null" }, Z: { type: "string" } },
-        responses: { One: ok({ type: "number" }) },
-      },
-    });
-    expect(Object.values(registry.operations).map((operation) => [operation.response, operation.result])).toEqual([
-      ["json", { union: [{ ref: "Z" }, "boolean"] }],
-      ["json", { union: ["number", "null"] }],
-      ["json", { ref: "A" }],
-    ]);
-    expect(Object.entries(registry.schemas)).toEqual([
-      ["A", "number"],
-      ["Z", "string"],
-    ]);
-  });
-
-  test("merges allOf parts and a shared oneOf base at the node level", () => {
-    const wallet = {
-      type: "object",
-      required: ["id"],
-      properties: { id: { type: "string" }, key: { type: "string" }, owner: { $ref: "#/components/schemas/Owner" } },
-    };
-    const properties = {
-      wallet: {
-        allOf: [
-          { $ref: "#/components/schemas/Wallet" },
-          { type: "object", required: ["key"] },
-          { not: { required: ["secret"] } },
-        ],
-      },
-      answer: {
-        type: "object",
-        required: ["meta"],
-        properties: { meta: { type: "string" }, results: { type: "array", items: { type: "number" } } },
-        oneOf: [{ required: ["results"], properties: { results: { type: "array" } } }, { required: ["text"] }],
-      },
-      either: { description: "Either one.", oneOf: [{ $ref: "#/components/schemas/Wallet" }, { type: "null" }] },
-      labels: { allOf: [{ type: "object", additionalProperties: { type: "string" } }, { description: "Labels." }] },
-      keyed: { required: ["kind"], oneOf: [{ properties: { kind: { const: "a" } } }] },
-      named: { properties: { kind: { const: "b" } }, oneOf: [{ required: ["kind"] }] },
-    };
-    const registry = readRegistry(spec(post(json({ properties })), { Wallet: wallet, Owner: { type: "string" } }));
-    const string = { shape: "string", optional: false };
-    expect(registry.operations["make"]?.args).toEqual({
-      wallet: {
-        shape: { object: { id: string, key: string, owner: { shape: { ref: "Owner" }, optional: true } } },
-        optional: true,
-      },
-      answer: {
-        shape: {
-          union: [
-            { object: { meta: string, results: { shape: { array: "number" }, optional: false } } },
-            { object: { meta: string, results: { shape: { array: "number" }, optional: true } } },
-          ],
-        },
-        optional: true,
-      },
-      either: { shape: { union: [{ ref: "Wallet" }, "null"] }, optional: true },
-      labels: { shape: { record: "string" }, optional: true },
-      keyed: { shape: { object: { kind: { shape: { literal: "a" }, optional: false } } }, optional: true },
-      named: { shape: { object: { kind: { shape: { literal: "b" }, optional: false } } }, optional: true },
-    });
-  });
-
-  test("names a JSON-LD key without its @ and keeps the wire name", () => {
-    const doc = {
-      type: "object",
-      required: ["@id"],
-      properties: { "@id": { type: "string" }, "@type": { const: "A" }, "mail@to": { type: "string" } },
-    };
-    const body = json({ properties: { doc: { $ref: "#/components/schemas/Doc" } } });
-    const registry = readRegistry(spec(post(body), { Doc: doc }));
-    expect(registry.schemas["Doc"]).toEqual({
-      object: {
-        id: { shape: "string", optional: false, wire: "@id" },
-        type: { shape: { literal: "A" }, optional: true, wire: "@type" },
-        "mail@to": { shape: "string", optional: true },
-      },
-    });
-  });
-
-  test("stores each named schema once, keeps deep pointers by path and inlines other references", () => {
-    const registry = readRegistry(
-      objectSpec({ oneOf: [{ $ref: "#/components/schemas/Left" }, { $ref: "#/components/schemas/Right" }] }),
-    );
-    expect(registry.operations["make"]?.args).toEqual({
-      shared: { shape: { union: ["string", { ref: "Left/properties/shared" }] }, optional: false },
-      flag: { shape: "boolean", optional: true },
-      side: { shape: { union: [{ literal: "left" }, { literal: "right" }] }, optional: false },
-    });
-    expect(registry.schemas).toEqual({
-      Left: {
-        object: {
-          shared: { shape: "string", optional: false },
-          flag: { shape: "boolean", optional: true },
-          side: { shape: { literal: "left" }, optional: false },
-        },
-      },
-      "Left/properties/shared": "string",
-      Right: {
-        object: {
-          shared: { shape: { ref: "Left/properties/shared" }, optional: false },
-          side: { shape: { literal: "right" }, optional: false },
-        },
-      },
-    });
-  });
-
-  test("builds each named schema once however many paths share it", () => {
-    const chain = Object.fromEntries(
-      Array.from({ length: 30 }, (_item, index) => {
-        const next = { $ref: `#/components/schemas/S${String(index + 1)}` };
-        return [`S${String(index)}`, { type: "object", properties: { a: next, b: next } }];
-      }),
-    );
-    const schemas = { ...chain, S30: { type: "string" } };
-    const registry = readRegistry(spec(post(json({ $ref: "#/components/schemas/S0" })), schemas));
-    expect(Object.keys(registry.schemas)).toHaveLength(31);
-    expect(registry.schemas["S29"]).toEqual({
-      object: { a: { shape: { ref: "S30" }, optional: true }, b: { shape: { ref: "S30" }, optional: true } },
-    });
-  });
-
-  test("reads every event type", () => {
-    expect(
-      eventTypes(spec({}, { EventType: { enum: ["tweet.new"] }, PostEventType: { enum: ["post.edited", 1] } })),
-    ).toEqual(["tweet.new", "post.edited"]);
-    expect(eventTypes(null)).toEqual([]);
+    expect(Object.keys(registry.operations)).toStrictEqual(["alpha", "zeta"]);
   });
 });
 
-describe("the registry parser", () => {
-  test("accepts every shape and rejects anything else", () => {
-    for (const shape of [
-      "string",
-      "any",
-      "bytes",
-      { ref: "SearchTweet" },
-      { literal: true },
-      { literal: 1 },
-      { array: "null" },
-      { record: "number" },
-      { union: ["string", { literal: 1 }] },
-    ]) {
-      expect(isShape(shape)).toBe(true);
-    }
-    const rejected = [
-      "date",
-      { literal: {} },
-      { array: "x" },
-      { object: { a: { shape: "string" } } },
-      { union: "x" },
-      { union: ["string", "date"] },
-      { ref: 1 },
-      { object: { a: { shape: "string", optional: false, wire: 1 } } },
-      { tuple: ["string"] },
-      { a: 1, b: 2 },
-      { literal: "x", array: "string" },
-      {},
-      [],
-      1,
-      null,
-    ];
-    for (const shape of rejected) {
-      expect(isShape(shape)).toBe(false);
-    }
-    expect(isShape({ object: { a: { shape: "string", optional: false } } })).toBe(true);
-    expect(isShape({ object: { id: { shape: "string", optional: false, wire: "@id" } } })).toBe(true);
+describe("the generated results", () => {
+  it("types each result as the union of its success responses", { timeout: 10_000 }, () => {
+    expect.hasAssertions();
+    const registry = readRegistry({
+      components: {
+        responses: { One: ok({ type: "number" }) },
+        schemas: { Alpha: { type: "number" }, Beta: { type: "null" }, Zeta: { type: "string" } },
+      },
+      paths: {
+        "/a": {
+          get: {
+            operationId: "both",
+            responses: { 200: schemaRef("Zeta"), 202: ok({ type: "boolean" }), 400: schemaRef("Beta") },
+          },
+        },
+        "/b": { get: { operationId: "maybe", responses: { 200: { $ref: "#/components/responses/One" }, 204: {} } } },
+        "/c": { get: { operationId: "same", responses: { 200: schemaRef("Alpha"), 201: schemaRef("Alpha") } } },
+      },
+      security: [{ apiKey: [] }],
+    });
+    expect(Object.values(registry.operations).map((operation) => [operation.response, operation.result])).toStrictEqual(
+      [
+        ["json", { union: [{ ref: "Zeta" }, "boolean"] }],
+        ["json", { union: ["number", "null"] }],
+        ["json", { ref: "Alpha" }],
+      ],
+    );
+    expect(Object.entries(registry.schemas)).toStrictEqual([
+      ["Alpha", "number"],
+      ["Zeta", "string"],
+    ]);
   });
 
-  test("rejects a malformed registry", () => {
-    const good = {
-      method: "GET",
-      path: "/",
-      params: [{ name: "a", in: "query", wire: "a" }],
-      body: ["x"],
-      response: "json",
-      args: {},
-      result: { ref: "A" },
-    };
-    const registry = { operations: { a: good }, schemas: { A: "string" } };
-    expect(parseRegistry(registry)).toEqual(registry);
-    for (const bad of [
-      null,
-      { a: null },
-      { a: good, b: { ...good, response: "xml" } },
-      { a: { ...good, method: 1 } },
-      { a: { ...good, params: [{ name: "a", in: "cookie", wire: "a" }] } },
-      { a: { ...good, params: [{ name: 1, in: "query", wire: "a" }] } },
-      { a: { ...good, params: [{ name: "a", in: "query", wire: 1 }] } },
-      { a: { ...good, body: [1] } },
-      { a: { ...good, body: ["x", 1] } },
-      { a: { ...good, response: "xml" } },
-      { a: { ...good, args: { x: { shape: "date", optional: true } } } },
-      { a: { ...good, path: 1 } },
-      { a: { ...good, result: "date" } },
-    ]) {
-      expect(() => parseRegistry({ operations: bad, schemas: {} })).toThrow(
-        "The operation registry is malformed. Run npm run generate.",
-      );
-    }
-    for (const bad of [
-      null,
-      { operations: {} },
-      { schemas: {} },
-      { operations: {}, schemas: { A: "string", B: "date" } },
-    ]) {
-      expect(() => parseRegistry(bad)).toThrow("The operation registry is malformed. Run npm run generate.");
-    }
+  it("reads every event type", { timeout: 10_000 }, () => {
+    expect.hasAssertions();
+    const events = spec(
+      {},
+      { EventType: { enum: ["tweet.new"] }, PostEventType: { enum: ["post.edited", NOT_AN_EVENT] } },
+    );
+    expect(eventTypes(events)).toStrictEqual(["tweet.new", "post.edited"]);
+    expect(eventTypes(null)).toStrictEqual([]);
+  });
+});
+
+describe("the generator errors", () => {
+  it("names each schema it cannot turn into arguments", { timeout: 10_000 }, () => {
+    expect.hasAssertions();
+    expect(() => bodyRegistry({ type: "array" })).toThrow('make has {"array":"any"} where it needs an object.');
+    expect(() => bodyRegistry({ type: "string" })).toThrow('make has "string" where it needs an object.');
+    expect(() => bodyRegistry({ enum: [{}] })).toThrow("the enum value {}");
+    expect(() => bodyRegistry({ $ref: "#/components/schemas/Missing" })).toThrow("broken reference");
+  });
+
+  it("names each reference cycle and each argument clash", { timeout: 10_000 }, () => {
+    expect.hasAssertions();
+    const clash = post(json({ properties: { id: { type: "string" } } }), { 201: {} }, [
+      { in: "query", name: "id", schema: { type: "string" } },
+    ]);
+    expect(() => bodyRegistry({ allOf: [{ $ref: "#/components/schemas/Loop" }] }, LOOP_SCHEMAS)).toThrow(LOOP_CYCLE);
+    expect(() => bodyRegistry({ $ref: "#/components/schemas/Node" }, NODE_SCHEMAS)).toThrow(
+      "openapi.json has the reference cycle #/components/schemas/Node > #/components/schemas/Node.",
+    );
+    expect(() => bodyRegistry({ $ref: "#/components/schemas/Loop" }, LOOP_SCHEMAS)).toThrow(LOOP_CYCLE);
+    expect(() => readRegistry(spec(clash))).toThrow("make has a parameter and a body field both named id.");
+    expect(() => bodyRegistry({ properties: DONE_THEN_LOOP }, LOOP_SCHEMAS)).toThrow(LOOP_CYCLE);
   });
 });

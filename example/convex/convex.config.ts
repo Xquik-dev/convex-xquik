@@ -1,9 +1,14 @@
+import type { AppDefinition } from "convex/server";
 import { defineApp } from "convex/server";
 import { v } from "convex/values";
 import xquik from "xquik-convex/convex.config.js";
 
-const app = defineApp({ env: { XQUIK_API_KEY: v.optional(v.string()) } });
+const env = { XQUIK_API_KEY: v.optional(v.string()) };
 
-app.use(xquik, { httpPrefix: "/xquik/", env: { XQUIK_API_KEY: app.env.XQUIK_API_KEY } });
+function exampleApp(): AppDefinition<typeof env> {
+  const app = defineApp({ env });
+  app.use(xquik, { env: { XQUIK_API_KEY: app.env.XQUIK_API_KEY }, httpPrefix: "/xquik/" });
+  return app;
+}
 
-export default app;
+export default exampleApp();

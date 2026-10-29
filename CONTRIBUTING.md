@@ -20,12 +20,13 @@ bin/check-local
 10. Prettier checks the format of every TypeScript, JavaScript and Markdown file.
 11. `tsc` checks the types with strict compiler options, including the JavaScript config files.
 12. ESLint runs the strict type-checked rules and every Convex rule on every file, and `test/lint.test.ts` fails when a file runs a Convex rule below `error`. ESLint bans `any`, type assertions and non-null assertions. Each public component function calls `requireApiKey` first, so it throws `missing_api_key` until the deployment sets `XQUIK_API_KEY`.
-13. type-coverage needs every value of every tracked file typed without `any`.
-14. `npm audit` checks the dependencies, and `npm audit signatures` checks their registry signatures.
-15. Vitest runs every test. The tests must run every line, branch, function and statement of every tracked source file.
-16. Stryker must kill every mutant of every tracked source file, with the TypeScript checker on.
-17. `npm pack` must hold the files that apps import.
-18. CodeQL runs its security-extended queries over the tracked files.
+13. oxlint runs every rule of its eslint, typescript, unicorn, oxc, react, nextjs, import, jsdoc, jsx-a11y, node, promise, jest and vitest plugins at `error`, type-aware, on every file. `test/lint.test.ts` fails when a rule that oxlint registers for those plugins runs below `error`, unless it is one of the rules the test names with the rule or Convex requirement it contradicts.
+14. type-coverage needs every value of every tracked file typed without `any`.
+15. `npm audit` checks the dependencies, and `npm audit signatures` checks their registry signatures.
+16. Vitest runs every test. The tests must run every line, branch, function and statement of every tracked source file.
+17. Stryker must kill every mutant of every tracked source file, with the TypeScript checker on.
+18. `npm pack` must hold the files that apps import.
+19. CodeQL runs its security-extended queries over the tracked files.
 
 Fix what a check finds. Never suppress a finding or narrow a check.
 

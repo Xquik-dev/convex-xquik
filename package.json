@@ -39,8 +39,8 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
-      "types": "./dist/client/index.d.ts",
-      "default": "./dist/client/index.js"
+      "types": "./dist/client.d.ts",
+      "default": "./dist/client.js"
     },
     "./test": "./src/test.ts",
     "./_generated/component.js": {
@@ -60,8 +60,14 @@
       "default": "./dist/component/convex.config.js"
     }
   },
-  "types": "./dist/client/index.d.ts",
-  "module": "./dist/client/index.js",
+  "imports": {
+    "#example/*": "./example/*",
+    "#openapi.json": "./openapi.json",
+    "#scripts/*": "./scripts/*",
+    "#src/*": "./src/*"
+  },
+  "types": "./dist/client.d.ts",
+  "module": "./dist/client.js",
   "scripts": {
     "generate": "node -e \"import('./scripts/registry.ts').then((registry) => registry.writeGenerated('.'))\"",
     "typecheck": "tsc --noEmit",
@@ -89,6 +95,8 @@
     "convex-test": "0.0.66",
     "eslint": "10.13.0",
     "globals": "17.13.0",
+    "oxlint": "1.90.0",
+    "oxlint-tsgolint": "7.0.2005",
     "prettier": "3.9.10",
     "type-coverage": "2.30.4",
     "typescript": "6.0.3",
