@@ -2,26 +2,17 @@ import { bodyRegistry, json, post, spec } from "./registry-specs.ts";
 import { describe, expect, it } from "vitest";
 import { eventTypes, operationsModule, readRegistry, registryJson } from "#scripts/registry.ts";
 import { none, parseRegistry } from "#src/component/shape.ts";
+import { format } from "prettier";
+import type { Options } from "prettier";
+import prettierOptions from "#.prettierrc.json" with { type: "json" };
 
 interface Generated {
   readonly ids: readonly string[];
-  readonly lines: readonly string[];
   readonly operations: readonly string[];
+  readonly text: string;
 }
 
 const PUBLIC_OPERATIONS = 190;
-const FIRST_LINE = 0;
-const HEAD_LINES = 8;
-const REGISTRY_HEAD = [
-  "{",
-  '  "operations": {',
-  '    "addTicketMessage": {',
-  '      "args": {',
-  '        "id": { "optional": false, "shape": "string" },',
-  '        "idempotencyKey": { "optional": true, "shape": "string" },',
-  '        "body": { "optional": false, "shape": { "ref": "SupportMessageBody" } }',
-  "      },",
-];
 const NOT_AN_EVENT = 1;
 
 const KEYED_SPEC = {
@@ -99,8 +90,8 @@ async function generate(): Promise<Generated> {
   const registry: unknown = JSON.parse(text);
   return {
     ids: Object.keys(parseRegistry(registry).operations),
-    lines: text.split("\n").slice(FIRST_LINE, HEAD_LINES),
     operations: operationsModule().split("\n"),
+    text,
   };
 }
 
@@ -115,10 +106,11 @@ function schemaRef(name: string): unknown {
 describe("the generator", () => {
   it("writes the registry and 1 action export per public operation", { timeout: 10_000 }, async () => {
     expect.hasAssertions();
-    const { ids, lines, operations } = await generate();
+    const { ids, operations, text } = await generate();
+    const options: Options = { parser: "json" };
     const names = ids.map((id) => `  ${id},`);
     expect(ids).toHaveLength(PUBLIC_OPERATIONS);
-    expect(lines).toStrictEqual(REGISTRY_HEAD);
+    await expect(format(text, Object.assign(options, prettierOptions))).resolves.toBe(text);
     expect(operations).toStrictEqual([
       'import { operations } from "./operation.js";',
       "",

@@ -249,21 +249,22 @@ lint_settings() {
     | {
       banned: .,
       below: $below,
-      clashing: [$out[0][] | (.clashes // [])[] | select(. as $rule | $below | index($rule))],
+      clashing: [$out[0][] | (.clashes // [])[] | select(. as $rule | ($registered - $below) | index($rule) | not)],
+      reasons: ([$out[0][] | .reason | type] | unique),
       left: ($out[0] | keys),
       options: ($config[0].options | {denyWarnings, typeAware, typeCheck}),
       typeAware: ($registered | index("typescript/no-floating-promises") != null)
     }')" || return
-  jq -e '.banned == [] and .clashing == [] and (.below | sort) == .left and .typeAware
+  jq -e '.banned == [] and .clashing == [] and .reasons == ["string"] and (.below | sort) == .left and .typeAware
     and .options == {denyWarnings: true, typeAware: true, typeCheck: true}' <<<"${oxlint_report}" >/dev/null || {
-    echo "oxlint must run every rule of its 13 plugins at error except those lint/left-out-rules.json names, with each rule they clash with on, type-aware with the type check, and fail on a warning. ${oxlint_report}" >&2
+    echo "oxlint must run every rule of its 13 plugins at error, except the ones lint/left-out-rules.json names with a reason. Each rule they clash with must run. oxlint must run type-aware with the type check and fail on a warning. ${oxlint_report}" >&2
     return 1
   }
 }
 
 lint_code_health() {
   local fallow=node_modules/.bin/fallow
-  "${fallow}" health --no-cache --complexity --fail-on-issues --quiet &&
+  "${fallow}" health --no-cache --complexity --coverage coverage/coverage-final.json --fail-on-issues --quiet &&
     "${fallow}" dupes --no-cache --quiet &&
     "${fallow}" dupes --no-cache --cross-language --quiet &&
     "${fallow}" dead-code --no-cache --quiet
@@ -384,13 +385,13 @@ run_check "lint" "Type-aware lint with every Convex rule" "Fix the lint findings
 run_check "oxlint" "Type-aware oxlint with every rule of 13 plugins" "Fix the oxlint findings above." lint_oxlint
 run_check "lint settings" "Every Convex rule at error and every oxlint rule of 13 plugins on" \
   "Turn each rule named above on at error, or name it with its proof in lint/left-out-rules.json." lint_settings
-run_check "fallow" "Complexity, duplication and dead code with fallow" \
-  "Split each function, merge each clone and delete each unused export or dependency listed above." lint_code_health
 run_check "100% typed" "Type coverage" "Give each value listed above a type without any." type_coverage
 run_check "audit" "Dependency audit and registry signatures" "Upgrade each package named above, then rerun." \
   audit_dependencies
 run_check "100% coverage" "Tests with 100% line, branch, function and statement coverage" \
   "Fix the failing tests, run the skipped ones, or test the lines listed above." run_tests
+run_check "fallow" "Complexity, duplication and dead code with fallow" \
+  "Split each function, merge each clone and delete each unused export or dependency listed above." lint_code_health
 run_check "100% mutation score" "Mutation testing" "Write a test that kills each surviving mutant above." \
   npm run --silent mutation
 run_check "package" "Package contents" "Fix the files list in package.json." package_contents

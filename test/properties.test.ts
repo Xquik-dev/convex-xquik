@@ -19,7 +19,7 @@ import {
 import { componentTest, rejection, sign, stubFetch } from "./helpers.js";
 import { describe, expect, it } from "vitest";
 import type { Field, Shape } from "#src/component/shape.ts";
-import { matches, registry, schema } from "#src/component/request.ts";
+import { registry, schema } from "#src/component/request.ts";
 import type { Arbitrary } from "fast-check";
 import { check as checkSignature } from "#src/component/delivery.ts";
 import { ConvexError } from "convex/values";
@@ -31,7 +31,6 @@ type Compound = Exclude<Shape, string | { readonly ref: string } | { readonly li
 
 const SEED = 20_261_029;
 const NOW = Date.parse("2026-10-29T08:00:00.000Z");
-const FIRST = 0;
 const ONE = 1;
 const FIVE_MINUTES_MS = 300_000;
 const JUST_STALE_MS = FIVE_MINUTES_MS + ONE;
@@ -41,7 +40,9 @@ const SMALL = 2;
 const NONCE_BYTES = 16;
 const REJECTED_BY_STUB = 418;
 const SKIP = Symbol("skip");
-const WRONG_VALUES: readonly Value[] = [true, ONE, "x", []];
+const NO_SHAPE_ACCEPTS = 1n;
+const OPERATIONS = Object.entries(registry.operations);
+const RUNS_PER_OPERATION = 2;
 const STUB_ERROR = { error: "stub", status: REJECTED_BY_STUB };
 const FIXED_NONCE = "ab".repeat(NONCE_BYTES);
 const encoder = new TextEncoder();
@@ -113,27 +114,25 @@ function withArgument(args: Readonly<Record<string, Value>>, name: string, value
   return Object.fromEntries([...Object.entries(args), [name, value]]);
 }
 
-function wrongArguments(
+function acceptsAnything(shape: Shape): boolean {
+  if (typeof shape === "string") {
+    return shape === "any";
+  }
+  if ("ref" in shape) {
+    return acceptsAnything(schema(shape.ref));
+  }
+  return "union" in shape && shape.union.some((member) => acceptsAnything(member));
+}
+
+function invalidArguments(
   args: Readonly<Record<string, Field>>,
   valid: Readonly<Record<string, Value>>,
 ): Record<string, Value>[] {
-  return Object.entries(args).flatMap(([name, field]) =>
-    WRONG_VALUES.filter((candidate) => !field.optional && !matches(field.shape, candidate))
-      .slice(FIRST, ONE)
-      .map((value) => withArgument(valid, name, value)),
-  );
+  const wrong = Object.entries(args)
+    .filter(([, field]) => !acceptsAnything(field.shape))
+    .map(([name]) => withArgument(valid, name, NO_SHAPE_ACCEPTS));
+  return [withArgument(valid, "notAnArgument", ONE), ...wrong];
 }
-
-const operation = constantFrom(...Object.entries(registry.operations)).chain(([id, { args }]) =>
-  objectOf(args).map((valid) => ({ args, id, valid })),
-);
-
-const invalid = operation.chain(({ args, id, valid }) =>
-  constantFrom(withArgument(valid, "notAnArgument", ONE), ...wrongArguments(args, valid)).map((sent) => ({
-    id,
-    sent,
-  })),
-);
 
 function changeByte(text: string, at: number, shift: number): ArrayBuffer {
   const bytes = encoder.encode(text);
@@ -236,31 +235,38 @@ describe("the webhook timestamp check", () => {
 });
 
 describe("the operation argument validators", () => {
-  it("pass every generated set of valid arguments on to Xquik", { timeout: 60_000 }, async () => {
+  it("pass generated valid arguments of every operation on to Xquik", { timeout: 60_000 }, async () => {
     expect.hasAssertions();
-    const recorded = stubFetch(() => Response.json({ error: "stub" }, { status: REJECTED_BY_STUB }));
-    const call = caller();
-    await holds(
-      asyncProperty(operation, async ({ id, valid }) => {
-        const before = recorded.length;
-        await expect(call(id, valid)).resolves.toStrictEqual(STUB_ERROR);
-        expect(recorded).toHaveLength(before + ONE);
+    stubFetch(() => Response.json({ error: "stub" }, { status: REJECTED_BY_STUB }));
+    await Promise.all(
+      OPERATIONS.map(async ([id, { args }]) => {
+        const call = caller();
+        await holds(
+          asyncProperty(objectOf(args), async (valid) => {
+            await expect(call(id, valid)).resolves.toStrictEqual(STUB_ERROR);
+          }),
+          { numRuns: RUNS_PER_OPERATION, seed: SEED },
+        );
       }),
-      { seed: SEED },
     );
   });
 
-  it("reject a wrong type or an undeclared argument before calling Xquik", { timeout: 60_000 }, async () => {
+  it("reject a wrong type or an undeclared argument of every operation before calling Xquik", { timeout: 60_000 }, async () => {
     expect.hasAssertions();
     const recorded = stubFetch(() => Response.json({ error: "stub" }, { status: REJECTED_BY_STUB }));
-    const call = caller();
-    await holds(
-      asyncProperty(invalid, async ({ id, sent }) => {
-        const rejected = await call(id, sent);
-        expect(rejected).toBeInstanceOf(Error);
-        expect(rejected).not.toBeInstanceOf(ConvexError);
+    await Promise.all(
+      OPERATIONS.map(async ([id, { args }]) => {
+        const call = caller();
+        const sent = objectOf(args).chain((valid) => constantFrom(...invalidArguments(args, valid)));
+        await holds(
+          asyncProperty(sent, async (invalid) => {
+            const rejected = await call(id, invalid);
+            expect(rejected).toBeInstanceOf(Error);
+            expect(rejected).not.toBeInstanceOf(ConvexError);
+          }),
+          { numRuns: RUNS_PER_OPERATION, seed: SEED },
+        );
       }),
-      { seed: SEED },
     );
     expect(recorded).toStrictEqual([]);
   });

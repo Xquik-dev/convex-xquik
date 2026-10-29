@@ -1,7 +1,7 @@
 import { action, env, internalMutation, internalQuery, mutation, query } from "./_generated/server.js";
 import { argument, find, send } from "./request.js";
 import { ConvexError, v } from "convex/values";
-import { delivery, NONCE_TTL_MS } from "./delivery.js";
+import { deliveryValidator, NONCE_TTL_MS } from "./delivery.js";
 import type { GenericId, Infer } from "convex/values";
 import { isRecord, none } from "./shape.js";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
@@ -201,7 +201,7 @@ const remove = action({
 
 const ingest = internalMutation({
   args: {
-    delivery,
+    delivery: deliveryValidator,
     endpointId: v.id("endpoints"),
     nonce: v.string(),
   },

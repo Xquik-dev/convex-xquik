@@ -1,5 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "compilerOptions": { "assumeChangesOnlyAffectDirectDependencies": true },
   "include": ["src", "scripts", "example"]
 }

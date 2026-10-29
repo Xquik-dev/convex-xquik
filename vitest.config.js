@@ -13,7 +13,7 @@ export default defineConfig({
   test: {
     coverage: {
       provider: "v8",
-      reporter: ["text-summary", "lcov", "json-summary"],
+      reporter: ["text-summary", "lcov", "json", "json-summary"],
       thresholds: { branches: 100, functions: 100, lines: 100, statements: 100 },
     },
     environment: "edge-runtime",

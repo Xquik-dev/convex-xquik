@@ -1,8 +1,6 @@
-const MIN_WORKERS = 8;
-
 const config = {
   checkers: ["typescript"],
-  concurrency: Math.max(MIN_WORKERS, navigator.hardwareConcurrency),
+  concurrency: "100%",
   coverageAnalysis: "perTest",
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
   reporters: ["clear-text", "json", "progress"],
