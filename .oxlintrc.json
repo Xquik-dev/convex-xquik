@@ -1026,8 +1026,14 @@
   "overrides": [
     {
       "files": [
+        "example/convex/example.ts",
         "scripts/nodes.ts",
         "scripts/reader.ts",
+        "src/component/delivery.ts",
+        "src/component/http.ts",
+        "src/component/job.ts",
+        "src/component/jobs.ts",
+        "src/component/registry.ts",
         "src/component/request.ts",
         "src/component/shape.ts",
         "src/component/values.ts",

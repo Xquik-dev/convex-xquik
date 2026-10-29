@@ -125,10 +125,10 @@ install_tool() {
 
 no_banned_patterns() {
   local ignore_files
-  jq 'del(.overrides[]?.rules)' .oxlintrc.json >"${workspace}/.oxlintrc.json" || return
+  jq 'del(.overrides[]?.rules)' .oxlintrc.json >"${workspace}/oxlintrc-without-override-rules.json" || return
   git grep -nIP --untracked -f lint/banned-patterns.txt -- ':(exclude).oxlintrc.json'
   (($? == 1)) || return 1
-  (cd "${workspace}" && git grep --no-index -nIP -f "${root}/lint/banned-patterns.txt" -- .oxlintrc.json)
+  (cd "${workspace}" && git grep --no-index -nIP -f "${root}/lint/banned-patterns.txt" -- oxlintrc-without-override-rules.json)
   (($? == 1)) || return 1
   ignore_files="$(git ls-files --cached --others --exclude-standard -- ':(glob)**/.*ignore' ':(exclude,glob)**/.gitignore')" ||
     return
@@ -272,7 +272,7 @@ lint_settings() {
   jq -e '.banned == [] and .clashing == [] and .reasons == ["string"] and .proofs == [true] and (.below | sort) == .left
     and .scopedOff == [] and .overrides and .unpinnable == [] and .typeAware
     and .options == {denyWarnings: true, typeAware: true, typeCheck: true}' <<<"${oxlint_report}" >/dev/null || {
-    echo "oxlint must run every rule of its 13 plugins at error, except the ones lint/left-out-rules.json names with a reason and the link to its failing proof. A rule the table scopes to files runs at error, and 1 override turns only that rule off in exactly those tracked paths, with no glob. No other override exists. Each rule they clash with must run at error. oxlint must run type-aware with the type check and fail on a warning. ${oxlint_report}" >&2
+    echo "oxlint must run every rule of its 13 plugins at error, except the ones lint/left-out-rules.json names with a reason and the link to its failing proof. Each rule the table scopes to files must run at error. Exactly 1 override must turn off only that rule, in those tracked paths, with no glob. No other override may exist. Each rule they clash with must run at error. oxlint must run type-aware with the type check and fail on a warning. ${oxlint_report}" >&2
     return 1
   }
   scoped="$(jq -r 'to_entries[] | select(.value | has("files")) | .key' lint/left-out-rules.json)" || return

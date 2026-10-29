@@ -16,12 +16,18 @@
     "reason": "Convex's contract and Xquik's API carry JSON null, as in webhooks.list's testedAt and the first page's cursor.",
     "proof": "https://github.com/Xquik-dev/xquik-convex/pull/11#issuecomment-6494680583",
     "files": {
-      "scripts/nodes.ts": 1,
+      "example/convex/example.ts": 1,
+      "scripts/nodes.ts": 3,
       "scripts/reader.ts": 1,
-      "src/component/request.ts": 2,
-      "src/component/shape.ts": 1,
+      "src/component/delivery.ts": 1,
+      "src/component/http.ts": 1,
+      "src/component/job.ts": 2,
+      "src/component/jobs.ts": 2,
+      "src/component/registry.ts": 1,
+      "src/component/request.ts": 4,
+      "src/component/shape.ts": 2,
       "src/component/values.ts": 1,
-      "src/component/webhooks.ts": 2,
+      "src/component/webhooks.ts": 6,
       "test/access.test.ts": 1,
       "test/coverage.test.ts": 6,
       "test/events.test.ts": 6,
@@ -39,7 +45,7 @@
     }
   },
   "vitest/no-importing-vitest-globals": {
-    "reason": "An alias such as it as check passes only when expect-expect and require-hook name it in their options, which hides 3 exceptions in place of this 1.",
+    "reason": "An alias such as it as check passes only when expect-expect and require-hook of both the jest and vitest plugins name it in their options, which hides 5 exceptions in place of this 1.",
     "proof": "https://github.com/Xquik-dev/xquik-convex/pull/11#issuecomment-6494669419",
     "clashes": ["vitest/prefer-importing-vitest-globals"]
   }
