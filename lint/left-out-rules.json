@@ -14,7 +14,7 @@
   },
   "unicorn/no-null": {
     "reason": "Convex's contract and Xquik's API carry JSON null, as in webhooks.list's testedAt and the first page's cursor.",
-    "proof": "https://github.com/Xquik-dev/xquik-convex/pull/9#issuecomment-1",
+    "proof": "https://github.com/Xquik-dev/xquik-convex/pull/11#issuecomment-6494680583",
     "files": {
       "scripts/nodes.ts": 1,
       "scripts/reader.ts": 1,
@@ -40,7 +40,7 @@
   },
   "vitest/no-importing-vitest-globals": {
     "reason": "An alias such as it as check passes only when expect-expect and require-hook name it in their options, which hides 3 exceptions in place of this 1.",
-    "proof": "https://github.com/Xquik-dev/xquik-convex/pull/9#issuecomment-1",
+    "proof": "https://github.com/Xquik-dev/xquik-convex/pull/11#issuecomment-6494669419",
     "clashes": ["vitest/prefer-importing-vitest-globals"]
   }
 }
