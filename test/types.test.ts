@@ -22,7 +22,10 @@ describe("operation result types", () => {
     expectTypeOf<OperationResult<"exportExtraction">>().toEqualTypeOf<ArrayBuffer>();
     expectTypeOf<OperationResult<"deleteDraft">>().toEqualTypeOf<null>();
     expectTypeOf<OperationResult<"streamEvents">[number]>().toHaveProperty("data");
-    expect([matches(find("getUser").result, user)]).toStrictEqual([true]);
+    expect([user, { id: "11348282" }].map((value) => matches(find("getUser").result, value))).toStrictEqual([
+      true,
+      false,
+    ]);
   });
 
   it("a JSON-LD key keeps its value under a Convex name", { timeout: 5000 }, () => {

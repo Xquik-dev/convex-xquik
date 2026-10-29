@@ -176,11 +176,10 @@ describe("idempotency keys", () => {
       return id;
     });
     expect(recorded.map(({ headers }) => headers.get("idempotency-key"))).toStrictEqual([`${jobId}-0`, `${jobId}-0`]);
-    await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({
-      attempts: 0,
-      runs: 1,
-      status: "succeeded",
-    });
+    const settled = await convex.query(api.jobs.get, { jobId });
+    expect(settled).toMatchObject({ attempts: 0, runs: 1, status: "succeeded" });
+    expect(settled).not.toHaveProperty("error");
+    expect(settled).not.toHaveProperty("scheduledId");
   });
 
   it("fills the Idempotency-Key of a write so its retries stay safe", { timeout: 10_000 }, async () => {
@@ -275,6 +274,7 @@ describe("stopped jobs", () => {
     await expect(
       Promise.all([ids.stuck, ids.unscheduled].map(async (jobId) => await convex.query(api.jobs.get, { jobId }))),
     ).resolves.toMatchObject([STOPPED, STOPPED]);
+    await expect(convex.query(api.jobs.get, { jobId: ids.stuck })).resolves.not.toHaveProperty("scheduledId");
   });
 });
 

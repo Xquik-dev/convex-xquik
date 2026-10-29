@@ -45,6 +45,7 @@ describe("job queries", () => {
     await convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: none } });
     expect(recorded).toHaveLength(NO_REQUESTS);
     await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({ runs: 0, status: "canceled" });
+    await expect(convex.query(api.jobs.get, { jobId })).resolves.not.toHaveProperty("scheduledId");
   });
 });
 

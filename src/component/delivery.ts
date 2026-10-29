@@ -79,7 +79,10 @@ function monitorOf(monitorId: unknown): { monitorId?: string } {
   return {};
 }
 
-function readEvent(item: unknown, names: { readonly id: string; readonly type: string }): EventFields[] {
+function readEvent(
+  item: unknown,
+  names: { readonly id: string; readonly type: string },
+): readonly [] | readonly [EventFields] {
   if (!isRecord(item)) {
     return [];
   }

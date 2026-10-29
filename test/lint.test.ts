@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
-import { isList, isRecord, none } from "#src/component/shape.ts";
+import { isList, isRecord } from "#src/component/shape.ts";
 import convex from "@convex-dev/eslint-plugin";
 import { ESLint } from "eslint";
 import { execFileSync } from "node:child_process";
@@ -32,6 +32,10 @@ const LEFT_OUT = {
   "vitest/no-importing-vitest-globals":
     "An alias such as it as check hides each test from require-hook and expect-expect.",
 };
+const CLASHES = {
+  "oxc/no-async-await": ["promise/prefer-await-to-then", "typescript/promise-function-async"],
+  "vitest/no-importing-vitest-globals": ["vitest/prefer-importing-vitest-globals"],
+};
 
 const root = execFileSync("git", ["rev-parse", "--show-toplevel"], { encoding: "utf8" }).trim();
 const files = execFileSync("git", ["ls-files", "--cached", "--others", "--exclude-standard", "*.ts", "*.js"], {
@@ -54,7 +58,7 @@ function entry(value: unknown, key: string): unknown {
   if (isRecord(value)) {
     return value[key];
   }
-  return none;
+  return {};
 }
 
 function level(setting: unknown): unknown {
@@ -129,6 +133,11 @@ describe("lint", () => {
       expect(registered).toContain("typescript/no-floating-promises");
       expect(registered.filter((name) => !running.has(name))).toStrictEqual(Object.keys(LEFT_OUT).toSorted());
       expect(banned).toStrictEqual([]);
+      expect(
+        Object.values(CLASHES)
+          .flat()
+          .filter((rule) => !running.has(rule)),
+      ).toStrictEqual([]);
     },
   );
 
