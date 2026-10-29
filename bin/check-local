@@ -257,7 +257,7 @@ lint_settings() {
     }')" || return
   jq -e '.banned == [] and .clashing == [] and .reasons == ["string"] and (.below | sort) == .left and .typeAware
     and .options == {denyWarnings: true, typeAware: true, typeCheck: true}' <<<"${oxlint_report}" >/dev/null || {
-    echo "oxlint must run every rule of its 13 plugins at error, except the ones lint/left-out-rules.json names with a reason. Each rule they clash with must run. oxlint must run type-aware with the type check and fail on a warning. ${oxlint_report}" >&2
+    echo "oxlint must run every rule of its 13 plugins at error, except the ones lint/left-out-rules.json names with a reason. Each rule they clash with must run at error. oxlint must run type-aware with the type check and fail on a warning. ${oxlint_report}" >&2
     return 1
   }
 }

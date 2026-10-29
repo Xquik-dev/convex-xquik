@@ -266,7 +266,7 @@ describe("the operation argument validators", () => {
           asyncProperty(objectOf(args), async (valid) => {
             const sent = invalidArguments(args, valid);
             const rejected = await Promise.all(sent.map(async (invalid) => await call(id, invalid)));
-            expect(rejected.filter((error) => !isValidationError(error))).toStrictEqual([]);
+            expect(sent.filter((_invalid, index) => !isValidationError(rejected[index]))).toStrictEqual([]);
           }),
           { numRuns: ONE, seed: SEED },
         );
