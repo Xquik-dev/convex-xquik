@@ -125,7 +125,10 @@ install_tool() {
 
 no_banned_patterns() {
   local ignore_files
-  git grep -nIP --untracked -f lint/banned-patterns.txt
+  jq 'del(.overrides[]?.rules)' .oxlintrc.json >"${workspace}/.oxlintrc.json" || return
+  git grep -nIP --untracked -f lint/banned-patterns.txt -- ':(exclude).oxlintrc.json'
+  (($? == 1)) || return 1
+  (cd "${workspace}" && git grep --no-index -nIP -f "${root}/lint/banned-patterns.txt" -- .oxlintrc.json)
   (($? == 1)) || return 1
   ignore_files="$(git ls-files --cached --others --exclude-standard -- ':(glob)**/.*ignore' ':(exclude,glob)**/.gitignore')" ||
     return
@@ -239,7 +242,7 @@ lint_settings() {
     git ls-files -z --cached >"${workspace}/tracked" || return
   oxlint_report="$(jq -c -n --slurpfile listed "${workspace}/oxlint-rules.json" \
     --slurpfile config "${workspace}/oxlint-config.json" --slurpfile out lint/left-out-rules.json \
-    --slurpfile root .oxlintrc.json --rawfile tracked "${workspace}/tracked" --rawfile bans lint/banned-patterns.txt '
+    --rawfile tracked "${workspace}/tracked" --rawfile bans lint/banned-patterns.txt '
     ["eslint", "import", "jest", "jsdoc", "jsx_a11y", "nextjs", "node", "oxc", "promise", "react", "typescript",
       "unicorn", "vitest"] as $plugins
     | [$listed[0][] | select(.scope as $scope | $plugins | index($scope))
@@ -258,8 +261,9 @@ lint_settings() {
         | test("^https://github\\.com/Xquik-dev/xquik-convex/pull/[0-9]+#issuecomment-[0-9]+$")) // false] | unique),
       left: [$out[0] | to_entries[] | select(.value | has("files") | not) | .key],
       scopedOff: [$scoped[].key | select(. as $rule | $below | index($rule))],
-      overrides: ((($root[0].overrides // []) | map(.files |= sort) | sort)
-        == ([$scoped[] | {files: (.value.files | keys), rules: {(.key): "off"}}] | sort)),
+      overrides: ((($config[0].overrides // []) | map(.files |= sort) | sort)
+        == ([$scoped[] | {files: (.value.files | keys), env: null, globals: null, plugins: null,
+          rules: {(.key): "allow"}}] | sort)),
       unpinnable: [$scoped[].value.files | keys[]
         | select(test("[*?{}!\\[\\]\\\\]") or (. as $path | $paths | index($path) | not))],
       options: ($config[0].options | {denyWarnings, typeAware, typeCheck}),
@@ -276,7 +280,7 @@ lint_settings() {
   for rule in "${rules[@]}"; do
     listing="$(jq -r --arg rule "${rule}" '.[$rule].files | keys[]' lint/left-out-rules.json)" || return
     mapfile -t paths <<<"${listing}"
-    jq --arg rule "${rule}" '{plugins, categories: {correctness: "off"}, rules: {($rule): .rules[$rule]}}' .oxlintrc.json \
+    jq --arg rule "${rule}" '{plugins, categories: {correctness: "allow"}, rules: {($rule): .rules[$rule]}}' .oxlintrc.json \
       >"${workspace}/scoped-rule.json" || return
     node_modules/.bin/oxlint -c "${workspace}/scoped-rule.json" --format=json "${paths[@]}" >"${workspace}/scoped.json" ||
       (($? == 1)) || return
