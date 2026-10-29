@@ -1,5 +1,5 @@
 import type { Field, Param, Shape } from "#src/component/shape.ts";
-import { isList, isRecord } from "#src/component/shape.ts";
+import { isList, isNull, isRecord, none } from "#src/component/shape.ts";
 
 type Node = Readonly<Record<string, unknown>>;
 
@@ -87,7 +87,7 @@ function union(shapes: readonly Shape[]): Shape {
 }
 
 function literal(value: unknown): Shape {
-  if (value === null) {
+  if (isNull(value)) {
     return "null";
   }
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
@@ -150,8 +150,8 @@ function operationArgs(
 }
 
 function bodyNames(body: Shape | null, fields: Fields): string[] | null {
-  if (body === null) {
-    return null;
+  if (isNull(body)) {
+    return none;
   }
   return Object.keys(fields);
 }

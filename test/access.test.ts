@@ -1,9 +1,10 @@
 import { componentTest, rejection, SECRET, stubFetch } from "./helpers.js";
 import { describe, expect, it, vi } from "vitest";
 import { api } from "#src/component/_generated/api.ts";
+import { none } from "#src/component/shape.ts";
 
 const NO_REQUESTS = 0;
-const PAGE = { paginationOpts: { cursor: null, numItems: 10 } };
+const PAGE = { paginationOpts: { cursor: none, numItems: 10 } };
 const MISSING = {
   error: "missing_api_key",
   message: "Set XQUIK_API_KEY in the Convex dashboard and pass it to the xquik component in convex.config.ts.",

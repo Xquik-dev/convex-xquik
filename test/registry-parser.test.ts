@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isShape, parseRegistry } from "#src/component/shape.ts";
+import { isShape, none, parseRegistry } from "#src/component/shape.ts";
 
 const NOT_A_SHAPE = 1;
 const MALFORMED = "The operation registry is malformed. Run npm run generate.";
@@ -31,7 +31,7 @@ const REJECTED = [
   {},
   [],
   NOT_A_SHAPE,
-  null,
+  none,
 ];
 
 const GOOD = {
@@ -53,8 +53,8 @@ function changed(name: string, value: unknown): unknown {
 }
 
 const BAD_OPERATIONS = [
-  null,
-  { make: null },
+  none,
+  { make: none },
   { make: GOOD, other: variant("response", "xml") },
   changed("method", NOT_A_SHAPE),
   changed("params", [{ in: "cookie", name: "make", wire: "make" }]),
@@ -68,19 +68,17 @@ const BAD_OPERATIONS = [
   changed("result", "date"),
 ];
 
-const BAD_REGISTRIES = [null, { operations: {} }, { schemas: {} }];
+const BAD_REGISTRIES = [none, { operations: {} }, { schemas: {} }];
 
 describe("the registry parser", () => {
   it("accepts every shape and rejects anything else", { timeout: 10_000 }, () => {
     expect.hasAssertions();
-    for (const shape of ACCEPTED) {
-      expect(isShape(shape)).toBe(true);
-    }
-    for (const shape of REJECTED) {
-      expect(isShape(shape)).toBe(false);
-    }
-    expect(isShape({ object: { field: { optional: false, shape: "string" } } })).toBe(true);
-    expect(isShape({ object: { id: { optional: false, shape: "string", wire: "@id" } } })).toBe(true);
+    const objects = [
+      { object: { field: { optional: false, shape: "string" } } },
+      { object: { id: { optional: false, shape: "string", wire: "@id" } } },
+    ];
+    expect([...ACCEPTED, ...objects].filter((shape) => !isShape(shape))).toStrictEqual([]);
+    expect(REJECTED.filter((shape) => isShape(shape))).toStrictEqual([]);
   });
 
   it("rejects a malformed registry", { timeout: 10_000 }, () => {

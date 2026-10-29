@@ -1,6 +1,6 @@
 import { ConvexError, v } from "convex/values";
 import type { Field, Operation, Shape } from "./shape.js";
-import { isList, isRecord, parseRegistry } from "./shape.js";
+import { isList, isNull, isRecord, parseRegistry } from "./shape.js";
 import { json, toValue } from "./values.js";
 import type { OptionalProperty, Validator, Value } from "convex/values";
 import data from "./registry.json" with { type: "json" };
@@ -24,7 +24,7 @@ const CHECKS: Readonly<Record<Primitive, (value: unknown) => boolean>> = {
   any: () => true,
   boolean: (value) => typeof value === "boolean",
   bytes: (value) => value instanceof ArrayBuffer,
-  null: (value) => value === null,
+  null: isNull,
   number: (value) => typeof value === "number",
   string: (value) => typeof value === "string",
 };

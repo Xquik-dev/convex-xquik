@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { Operation, Shape } from "#src/component/shape.ts";
 import { rejection, stubFetch } from "./helpers.js";
+import { none } from "#src/component/shape.ts";
+import type { Options } from "#src/component/request.ts";
 import { send } from "#src/component/request.ts";
 
 const STREAM_MS = 50;
@@ -16,7 +18,7 @@ const PARAMS: Operation["params"] = [
 ];
 
 function thing(response: Operation["response"], result: Shape = "any"): Operation {
-  return { args: {}, body: null, method: "GET", params: PARAMS, path: "/api/v1/things/{id}", response, result };
+  return { args: {}, body: none, method: "GET", params: PARAMS, path: "/api/v1/things/{id}", response, result };
 }
 
 const search = thing("json");
@@ -82,7 +84,7 @@ describe("send builds the request", () => {
   it("sends only the body fields that have values", { timeout: 5000 }, async () => {
     expect.hasAssertions();
     const recorded = stubFetch(() => new Response(""));
-    await expect(send(create, { goal: undefined, text: "hello" }, options)).resolves.toBeNull();
+    await expect(send(create, { text: "hello" }, options)).resolves.toBeNull();
     expect(recorded.map(({ body, headers }) => ({ body, type: headers.get("content-type") }))).toStrictEqual([
       { body: '{"text":"hello"}', type: "application/json" },
     ]);
@@ -117,7 +119,8 @@ describe("send reports failures", () => {
       message: "Set XQUIK_API_KEY in the Convex dashboard and pass it to the xquik component in convex.config.ts.",
       status: 401,
     };
-    const withoutKey = { apiKey: undefined, streamMs: STREAM_MS };
+    const unset: Partial<Options> = {};
+    const withoutKey = { apiKey: unset.apiKey, streamMs: STREAM_MS };
     await expect(rejection(send(search, { id: "1" }, withoutKey))).resolves.toStrictEqual(missing);
     const emptyKey = { apiKey: "", streamMs: STREAM_MS };
     await expect(rejection(send(search, { id: "1" }, emptyKey))).resolves.toStrictEqual(missing);
@@ -144,7 +147,7 @@ describe("send reads the answer", () => {
 
   it("returns no events for an empty stream body", { timeout: 5000 }, async () => {
     expect.hasAssertions();
-    stubFetch(() => new Response(null));
+    stubFetch(() => new Response(none));
     await expect(send(thing("events"), { id: "1" }, options)).resolves.toStrictEqual([]);
   });
 
