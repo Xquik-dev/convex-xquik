@@ -1,6 +1,5 @@
 import { argsOf, bodyRegistry, json, post, spec } from "./registry-specs.ts";
 import { describe, expect, it } from "vitest";
-import { none } from "#src/component/shape.ts";
 import { readRegistry } from "#scripts/registry.ts";
 
 const LEVEL_NUMBER = 1;
@@ -22,7 +21,7 @@ const SHAPES_BODY = {
     flag: { const: true },
     free: { type: "object" },
     kind: { const: "a" },
-    level: { enum: [LEVEL_NUMBER, "two", none] },
+    level: { enum: [LEVEL_NUMBER, "two", null] },
     map: { additionalProperties: { type: "boolean" }, type: "object" },
     mixed: { type: ["string", NOT_A_TYPE] },
     nested: { properties: { inner: { type: "boolean" } } },

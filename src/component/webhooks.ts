@@ -3,10 +3,10 @@ import { argument, find, send } from "./request.js";
 import { ConvexError, v } from "convex/values";
 import { deliveryValidator, NONCE_TTL_MS } from "./delivery.js";
 import type { GenericId, Infer } from "convex/values";
-import { isRecord, none } from "./shape.js";
 import { paginationOptsValidator, paginationResultValidator } from "convex/server";
 import type { FunctionHandle } from "convex/server";
 import { internal } from "./_generated/api.js";
+import { isRecord } from "./shape.js";
 import type { MutationCtx } from "./_generated/server.js";
 import requireApiKey from "./access.js";
 import schema from "./schema.js";
@@ -147,9 +147,9 @@ const list = query({
     return Object.assign(endpoints, {
       page: endpoints.page.map(({ _id, testedAt, token, webhookId }) => ({
         endpointId: _id,
-        testedAt: testedAt ?? none,
+        testedAt: testedAt ?? null,
         url: urlOf(token),
-        webhookId: webhookId ?? none,
+        webhookId: webhookId ?? null,
       })),
     });
   },

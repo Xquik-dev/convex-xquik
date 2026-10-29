@@ -24,7 +24,6 @@ import type { Arbitrary } from "fast-check";
 import { check as checkSignature } from "#src/component/delivery.ts";
 import { ConvexError } from "convex/values";
 import { makeFunctionReference } from "convex/server";
-import { none } from "#src/component/shape.ts";
 import type { Value } from "convex/values";
 
 type Compound = Exclude<Shape, string | { readonly ref: string } | { readonly literal: unknown }>;
@@ -56,7 +55,7 @@ const PRIMITIVES: Readonly<Record<Extract<Shape, string>, Arbitrary<Value>>> = {
   any: string(),
   boolean: boolean(),
   bytes: uint8Array({ maxLength: SMALL }).map((bytes) => Uint8Array.from(bytes).buffer),
-  null: constantFrom(none),
+  null: constantFrom(null),
   number: double({ noDefaultInfinity: true, noNaN: true }),
   string: string(),
 };

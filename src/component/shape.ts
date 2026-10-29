@@ -1,5 +1,3 @@
-import nothing from "./none.json" with { type: "json" };
-
 type Shape =
   | "string"
   | "number"
@@ -48,10 +46,8 @@ const LOCATIONS: ReadonlySet<unknown> = new Set(["path", "query", "header"]);
 const RESPONSES: ReadonlySet<unknown> = new Set(["json", "bytes", "events", "none"]);
 const SHAPE_KINDS = 1;
 
-const none: null = nothing;
-
 function isNull(value: unknown): value is null {
-  return typeof value === "object" && !value;
+  return value === null;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -74,7 +70,7 @@ function isField(value: unknown): value is Field {
   return (
     isRecord(value) &&
     typeof value["optional"] === "boolean" &&
-    ["string", "undefined"].includes(typeof value["wire"]) &&
+    (!Object.hasOwn(value, "wire") || typeof value["wire"] === "string") &&
     isShape(value["shape"])
   );
 }
@@ -152,5 +148,5 @@ function parseRegistry(value: unknown): Registry {
   throw new Error("The operation registry is malformed. Run npm run generate.");
 }
 
-export { isList, isNull, isRecord, isShape, none, parseRegistry };
+export { isList, isNull, isRecord, isShape, parseRegistry };
 export type { Field, Operation, Param, Registry, Response, Shape };

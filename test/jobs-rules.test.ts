@@ -4,13 +4,12 @@ import { describe, expect, it } from "vitest";
 import { failed, isLive, plan } from "#src/component/job.ts";
 import { ConvexError } from "convex/values";
 import { find } from "#src/component/request.ts";
-import { none } from "#src/component/shape.ts";
 import type { Outcome } from "#src/component/job.ts";
 
 const NO_JOBS = 0;
 const ONE_JOB = 1;
 const NO_REQUESTS = 0;
-const PAGE = { cursor: none, numItems: 5 };
+const PAGE = { cursor: null, numItems: 5 };
 
 describe("job queries", () => {
   it("lists jobs by status and refuses bad input", { timeout: 10_000 }, async () => {
@@ -42,7 +41,7 @@ describe("job queries", () => {
     await convex.mutation(api.jobs.cancel, { jobId });
     const recorded = stubFetch(() => Response.json({}));
     await convex.action(internal.jobs.run, { jobId });
-    await convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: none } });
+    await convex.mutation(internal.jobs.finish, { jobId, outcome: { ok: true, result: null } });
     expect(recorded).toHaveLength(NO_REQUESTS);
     await expect(convex.query(api.jobs.get, { jobId })).resolves.toMatchObject({ runs: 0, status: "canceled" });
     await expect(convex.query(api.jobs.get, { jobId })).resolves.not.toHaveProperty("scheduledId");
@@ -50,10 +49,10 @@ describe("job queries", () => {
 });
 
 describe(plan, () => {
-  const ok: Outcome = { ok: true, result: none };
-  const transient: Outcome = { error: none, ok: false, retryable: true };
-  const delayed: Outcome = { error: none, ok: false, retryAfterMs: 5, retryable: true };
-  const permanent: Outcome = { error: none, ok: false, retryable: false };
+  const ok: Outcome = { ok: true, result: null };
+  const transient: Outcome = { error: null, ok: false, retryable: true };
+  const delayed: Outcome = { error: null, ok: false, retryAfterMs: 5, retryable: true };
+  const permanent: Outcome = { error: null, ok: false, retryable: false };
 
   it("retries with exponential backoff or the server's delay", { timeout: 10_000 }, () => {
     expect.hasAssertions();
@@ -112,7 +111,7 @@ describe(failed, () => {
 
   it("treats an error that carries no data as transient", { timeout: 10_000 }, () => {
     expect.hasAssertions();
-    expect(failed(read, new ConvexError(none))).toStrictEqual({ error: none, ok: false, retryable: true });
+    expect(failed(read, new ConvexError(null))).toStrictEqual({ error: null, ok: false, retryable: true });
   });
 });
 
@@ -123,7 +122,7 @@ describe(isLive, () => {
       { state: { kind: "pending" } },
       { state: { kind: "inProgress" } },
       { state: { kind: "canceled" } },
-      none,
+      null,
     ];
     expect(runs.map((scheduled) => isLive(scheduled))).toStrictEqual([true, true, false, false]);
   });

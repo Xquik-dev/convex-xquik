@@ -1,5 +1,5 @@
-import { isRecord, none } from "./shape.js";
 import { ConvexError } from "convex/values";
+import { isRecord } from "./shape.js";
 import type { Operation } from "./shape.js";
 import { project } from "./registry.js";
 import requireApiKey from "./access.js";
@@ -57,7 +57,7 @@ function headers(operation: Operation, args: Inputs, apiKey: string): Headers {
 
 function body(operation: Operation, args: Inputs): string | null {
   if (!operation.body) {
-    return none;
+    return null;
   }
   return JSON.stringify(Object.fromEntries(operation.body.map((name) => [name, args[name]])));
 }
@@ -138,7 +138,7 @@ function failure(raw: string, status: number, retryAfter: number): ConvexError<V
 
 function answer(operation: Operation, raw: string): Value {
   if (operation.response !== "json" || raw === "") {
-    return none;
+    return null;
   }
   const value: unknown = JSON.parse(raw);
   return project(operation.result, value);

@@ -3,13 +3,12 @@ import { check, pulledEvents, readDelivery } from "#src/component/delivery.ts";
 import { componentTest, delivery, rejection, SECRET, sign, stubFetch, TEST_ALERT } from "./helpers.js";
 import { describe, expect, it, vi } from "vitest";
 import crons from "#src/component/crons.ts";
-import { none } from "#src/component/shape.ts";
 
 const OK = 200;
 const MOMENT_MS = 1;
 const FIVE_MINUTES_MS = 300_000;
 const NONCE_BYTES = 16;
-const PAGE = { paginationOpts: { cursor: none, numItems: 10 } };
+const PAGE = { paginationOpts: { cursor: null, numItems: 10 } };
 const STALE = { ok: false, reason: "stale timestamp" };
 const BAD = { ok: false, reason: "bad signature" };
 const INVALID = {
@@ -168,7 +167,7 @@ describe("delivery parsing", () => {
 
   it("pulledEvents reads the events list of a listEvents answer", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    expect(pulledEvents(none)).toStrictEqual([]);
+    expect(pulledEvents(null)).toStrictEqual([]);
     expect(pulledEvents({ events: 5 })).toStrictEqual([]);
   });
 

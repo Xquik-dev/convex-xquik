@@ -1,5 +1,5 @@
 import type { Field, Param, Shape } from "#src/component/shape.ts";
-import { isList, isNull, isRecord, none } from "#src/component/shape.ts";
+import { isList, isNull, isRecord } from "#src/component/shape.ts";
 
 type Node = Readonly<Record<string, unknown>>;
 
@@ -151,7 +151,7 @@ function operationArgs(
 
 function bodyNames(body: Shape | null, fields: Fields): string[] | null {
   if (isNull(body)) {
-    return none;
+    return null;
   }
   return Object.keys(fields);
 }
