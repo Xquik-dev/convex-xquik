@@ -148,9 +148,12 @@ function changeByte(text: string, at: number, shift: number): ArrayBuffer {
   }).buffer;
 }
 
-async function call(id: string, args: Readonly<Record<string, Value>>): Promise<unknown> {
-  const reference = makeFunctionReference<"action", Record<string, Value>, Value>(`operations:${id}`);
-  return await rejection(componentTest().action(reference, args));
+function caller(): (id: string, args: Readonly<Record<string, Value>>) => Promise<unknown> {
+  const backend = componentTest();
+  return async (id, args) => {
+    const reference = makeFunctionReference<"action", Record<string, Value>, Value>(`operations:${id}`);
+    return await rejection(backend.action(reference, args));
+  };
 }
 
 async function verdict(
@@ -238,6 +241,7 @@ describe("the operation argument validators", () => {
   it("pass every generated set of valid arguments on to Xquik", { timeout: 60_000 }, async () => {
     expect.hasAssertions();
     const recorded = stubFetch(() => Response.json({ error: "stub" }, { status: REJECTED_BY_STUB }));
+    const call = caller();
     await holds(
       asyncProperty(operation, async ({ id, valid }) => {
         const before = recorded.length;
@@ -251,6 +255,7 @@ describe("the operation argument validators", () => {
   it("reject a wrong type or an undeclared argument before calling Xquik", { timeout: 60_000 }, async () => {
     expect.hasAssertions();
     const recorded = stubFetch(() => Response.json({ error: "stub" }, { status: REJECTED_BY_STUB }));
+    const call = caller();
     await holds(
       asyncProperty(invalid, async ({ id, sent }) => {
         const rejected = await call(id, sent);
