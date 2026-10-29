@@ -1,11 +1,11 @@
 # Twitter API & X data in Convex with Xquik
 
+[![Convex Component](https://www.convex.dev/components/badge/convex-xquik)](https://www.convex.dev/components/convex-xquik)
+
 A Convex component for every public Xquik X API operation, signed webhooks & live event queries.
 
 Xquik is the world's fastest and cheapest X Twitter scraper service with the most complete X data.
 Xquik charges only for delivered, unique, filter-matching results and never pads rows.
-
-Read the full guide at [docs.xquik.com/guides/convex](https://docs.xquik.com/guides/convex).
 
 <!-- trust:start -->
 
@@ -34,6 +34,10 @@ Read the full guide at [docs.xquik.com/guides/convex](https://docs.xquik.com/gui
 Checked on 2026-10-28. See each number with its date & source on [xquik.com/trust](https://xquik.com/trust) or as [JSON](https://xquik.com/trust.json).
 
 <!-- trust:end -->
+
+<!-- START: Include on https://convex.dev/components -->
+
+Read the full guide at [docs.xquik.com/guides/convex](https://docs.xquik.com/guides/convex).
 
 ## What you get
 
@@ -139,11 +143,11 @@ Use it with `usePaginatedQuery(api.x.events, {}, { initialNumItems: 20 })`. Pass
 await xquik.schedule(ctx, "listEvents", { limit: 100 }, { key: "events", everyMs: 5 * 60 * 1000 });
 ```
 
-A job with a `key` runs once at a time, so calling this again returns the same job. A read, or a write that takes an `Idempotency-Key`, makes up to 5 attempts on a 429, a 5xx or a network error. The component fills the key for you. A result that breaks its schema fails the job without a retry. Scheduled `listEvents` jobs store their events with the webhook events. Read a job with `components.xquik.jobs.get` & stop it with `components.xquik.jobs.cancel`.
+While a job with the same `key` is scheduled or running, the call returns that job's ID. A read, or a write that takes an `Idempotency-Key`, makes up to 5 attempts on a 429, a 5xx or a network error. The component fills the key for you. A result that breaks its schema fails the job without a retry. Scheduled `listEvents` jobs store their events with the webhook events. Read a job with `components.xquik.jobs.get` & stop it with `components.xquik.jobs.cancel`.
 
 ## Keep credits safe
 
-Component functions run only from your backend. Wrap them in internal functions, or check the caller's identity & rate limit in each public function that spends credits. The example app keeps every credit-spending function internal.
+Component functions run only from your backend. Wrap them in internal functions, or check the caller's identity & rate limit in each public function that spends credits. The [example app](https://github.com/Xquik-dev/convex-xquik/tree/main/example) keeps every credit-spending function internal.
 
 ## Test your app
 
@@ -154,6 +158,8 @@ import xquikTest from "convex-xquik/test";
 const t = convexTest(schema, modules);
 xquikTest.register(t);
 ```
+
+<!-- END: Include on https://convex.dev/components -->
 
 ## Develop
 

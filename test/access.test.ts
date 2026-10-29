@@ -29,7 +29,7 @@ test("every public component function refuses a deployment without XQUIK_API_KEY
     "jobs.list": t.query(api.jobs.list, page),
     "webhooks.create": t.action(api.webhooks.create, { eventTypes: ["tweet.new"] }),
     "webhooks.add": t.mutation(api.webhooks.add, { secret: SECRET }),
-    "webhooks.list": t.query(api.webhooks.list, {}),
+    "webhooks.list": t.query(api.webhooks.list, page),
     "webhooks.remove": t.action(api.webhooks.remove, { endpointId }),
     "operations.getUser": t.action(api.operations.getUser, { id: "NASA" }),
   };

@@ -183,11 +183,12 @@ audit_dependencies() {
 package_contents() {
   local listing
   listing="$(npm pack --dry-run --json --ignore-scripts)" || return
-  jq -e '.[0].files | map(.path) as $paths
-    | ["dist/component/convex.config.js", "dist/component/_generated/component.d.ts", "dist/component/registry.json",
-       "dist/client/index.js", "src/test.ts", "LICENSE", "README.md"] | all(. as $wanted | $paths | index($wanted))' \
-    <<<"${listing}" >/dev/null || {
-    echo "npm pack leaves out a file that apps import." >&2
+  local missing
+  missing="$(jq -r --slurpfile manifest package.json '.[0].files | map(.path) as $paths
+    | [$manifest[0].exports | .. | strings | ltrimstr("./")] + ["dist/component/registry.json", "LICENSE", "README.md"]
+    | unique - $paths | join(" and ")' <<<"${listing}")" || return
+  [[ -z "${missing}" ]] || {
+    echo "npm pack leaves out ${missing}, which apps import." >&2
     return 1
   }
   ! jq -e '.[0].files | map(.path) | any(test("(^|/)\\.env"))' <<<"${listing}" >/dev/null
