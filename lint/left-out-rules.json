@@ -1,11 +1,29 @@
 {
-  "import/no-default-export": "Convex needs the default export of convex.config.ts, schema.ts, http.ts and crons.ts.",
-  "import/no-named-export": "Convex names each registered function after its named export.",
-  "no-undefined": "Convex removes a field from a document only when patch passes it undefined.",
-  "oxc/no-async-await": "typescript/promise-function-async",
-  "unicorn/no-null": "Convex has no undefined value, so the schema and the returns validators hold null.",
-  "vitest/no-importing-vitest-globals": "vitest/prefer-importing-vitest-globals",
-  "vitest/prefer-called-once": "vitest/prefer-called-times",
-  "vitest/prefer-to-be-falsy": "vitest/prefer-strict-boolean-matchers",
-  "vitest/prefer-to-be-truthy": "vitest/prefer-strict-boolean-matchers"
+  "import/no-default-export": {
+    "reason": "Convex needs the default export of convex.config.ts, schema.ts, http.ts and crons.ts."
+  },
+  "import/no-named-export": {
+    "reason": "Convex names each registered function after its named export."
+  },
+  "no-undefined": {
+    "reason": "Convex removes a field from a document only when patch passes it undefined."
+  },
+  "oxc/no-async-await": {
+    "reason": "typescript/promise-function-async"
+  },
+  "unicorn/no-null": {
+    "reason": "Convex has no undefined value, so the schema and the returns validators hold null."
+  },
+  "vitest/no-importing-vitest-globals": {
+    "reason": "vitest/prefer-importing-vitest-globals"
+  },
+  "vitest/prefer-called-once": {
+    "reason": "vitest/prefer-called-times"
+  },
+  "vitest/prefer-to-be-falsy": {
+    "reason": "vitest/prefer-strict-boolean-matchers"
+  },
+  "vitest/prefer-to-be-truthy": {
+    "reason": "vitest/prefer-strict-boolean-matchers"
+  }
 }

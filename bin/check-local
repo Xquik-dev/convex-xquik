@@ -244,17 +244,19 @@ lint_settings() {
     | [$listed[0][] | select(.scope as $scope | $plugins | index($scope))
       | if .scope == "eslint" then .value else "\(.scope)/\(.value)" end] as $registered
     | [$bans | split("\n")[] | select(. != "")] as $patterns
+    | [$registered[] | select(($config[0].rules[.] | if type == "array" then .[0] else . end) != "deny")] as $below
     | [$registered[] | select(. as $name | any($patterns[]; . as $pattern | try ($name | test($pattern)) catch false))]
     | {
       banned: .,
-      below: [$registered[] | select(($config[0].rules[.] | if type == "array" then .[0] else . end) != "deny")],
+      below: $below,
+      clashing: [$out[0][] | (.clashes // [])[] | select(. as $rule | $below | index($rule))],
       left: ($out[0] | keys),
       options: ($config[0].options | {denyWarnings, typeAware, typeCheck}),
       typeAware: ($registered | index("typescript/no-floating-promises") != null)
     }')" || return
-  jq -e '.banned == [] and (.below | sort) == .left and .typeAware
+  jq -e '.banned == [] and .clashing == [] and (.below | sort) == .left and .typeAware
     and .options == {denyWarnings: true, typeAware: true, typeCheck: true}' <<<"${oxlint_report}" >/dev/null || {
-    echo "oxlint must run every rule of its 13 plugins at error except those lint/left-out-rules.json names, type-aware with the type check, and fail on a warning. ${oxlint_report}" >&2
+    echo "oxlint must run every rule of its 13 plugins at error except those lint/left-out-rules.json names, with each rule they clash with on, type-aware with the type check, and fail on a warning. ${oxlint_report}" >&2
     return 1
   }
 }
