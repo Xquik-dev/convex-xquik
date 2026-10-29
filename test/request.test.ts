@@ -7,7 +7,6 @@ const STREAM_MS = 50;
 const ACCENT_SECOND_BYTE = 169;
 
 const options = { apiKey: "xq_test", streamMs: STREAM_MS };
-const unset: { readonly value?: string } = {};
 
 const PARAMS: Operation["params"] = [
   { in: "path", name: "id", wire: "id" },
@@ -83,7 +82,7 @@ describe("send builds the request", () => {
   it("sends only the body fields that have values", { timeout: 5000 }, async () => {
     expect.hasAssertions();
     const recorded = stubFetch(() => new Response(""));
-    await expect(send(create, { goal: unset.value, text: "hello" }, options)).resolves.toBeNull();
+    await expect(send(create, { goal: undefined, text: "hello" }, options)).resolves.toBeNull();
     expect(recorded.map(({ body, headers }) => ({ body, type: headers.get("content-type") }))).toStrictEqual([
       { body: '{"text":"hello"}', type: "application/json" },
     ]);
@@ -118,7 +117,7 @@ describe("send reports failures", () => {
       message: "Set XQUIK_API_KEY in the Convex dashboard and pass it to the xquik component in convex.config.ts.",
       status: 401,
     };
-    const withoutKey = { apiKey: unset.value, streamMs: STREAM_MS };
+    const withoutKey = { apiKey: undefined, streamMs: STREAM_MS };
     await expect(rejection(send(search, { id: "1" }, withoutKey))).resolves.toStrictEqual(missing);
     const emptyKey = { apiKey: "", streamMs: STREAM_MS };
     await expect(rejection(send(search, { id: "1" }, emptyKey))).resolves.toStrictEqual(missing);

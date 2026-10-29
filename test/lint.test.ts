@@ -142,4 +142,9 @@ describe("lint", () => {
       expect(contradicted.filter((rule) => !running.has(rule))).toStrictEqual([]);
     },
   );
+
+  it("oxlint runs type-aware with the type check and fails on a warning", { timeout: 30_000 }, () => {
+    expect.hasAssertions();
+    expect(entry(printed, "options")).toMatchObject({ denyWarnings: true, typeAware: true, typeCheck: true });
+  });
 });

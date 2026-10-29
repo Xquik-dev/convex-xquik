@@ -74,7 +74,7 @@ class Xquik {
    * Creates an Xquik webhook for the event types and an endpoint in the component that receives it.
    *
    * @param {ActionCtx} ctx The action context that calls Xquik.
-   * @param {{ eventTypes: EventTypes, onEvent?: EventHandler }} args `eventTypes` to deliver, and `onEvent`, a mutation that runs once for each `streamEventId` this endpoint receives. A retry or the `webhook.test` alert does not run it.
+   * @param {{ eventTypes: Readonly<EventTypes>, onEvent?: EventHandler }} args `eventTypes` to deliver, and `onEvent`, a mutation that runs once for each `streamEventId` this endpoint receives. A retry or the `webhook.test` alert does not run it.
    * @returns {Promise<{ endpointId: string, url: string, webhookId: string }>} The endpoint ID, its URL and the Xquik webhook ID.
    */
   public async createWebhook(

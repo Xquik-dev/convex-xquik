@@ -4,8 +4,6 @@ import { describe, expect, it } from "vitest";
 import type { Field, Shape } from "#src/component/shape.ts";
 import { toValue } from "#src/component/values.ts";
 
-const unset: { readonly value?: string } = {};
-
 const post: Shape = {
   object: {
     id: { optional: false, shape: "string" },
@@ -42,7 +40,7 @@ describe("parsing", () => {
 
   it("toValue keeps JSON values and turns anything else into null", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    expect(toValue({ count: 1, list: ["b", true, null, unset.value], run: () => "ignored" })).toStrictEqual({
+    expect(toValue({ count: 1, list: ["b", true, null, undefined], run: () => "ignored" })).toStrictEqual({
       count: 1,
       list: ["b", true, null, null],
       run: null,
@@ -109,7 +107,7 @@ describe(project, () => {
       id: "1",
       name: "Mars",
     });
-    expect(project("any", { list: ["b", unset.value] })).toStrictEqual({ list: ["b", null] });
+    expect(project("any", { list: ["b", undefined] })).toStrictEqual({ list: ["b", null] });
     expect(project({ literal: "post" }, "post")).toBe("post");
   });
 
@@ -136,7 +134,7 @@ describe(project, () => {
     expect(project({ array: "string" }, { alpha: 1 })).toStrictEqual({ alpha: 1 });
     expect(project({ record: "string" }, ["b"])).toStrictEqual(["b"]);
     expect(project(post, ["b"])).toStrictEqual(["b"]);
-    expect(project("string", unset.value)).toBeNull();
+    expect(project("string", undefined)).toBeNull();
   });
 });
 
@@ -152,6 +150,6 @@ describe(matches, () => {
 
   it("accepts anything for any", { timeout: 5000 }, () => {
     expect.hasAssertions();
-    expect(matches("any", unset.value)).toBe(true);
+    expect(matches("any", undefined)).toBe(true);
   });
 });
