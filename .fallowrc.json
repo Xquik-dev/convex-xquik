@@ -1,0 +1,15 @@
+{
+  "failOnParseError": true,
+  "entry": [
+    "src/component/convex.config.ts",
+    "src/component/crons.ts",
+    "src/component/events.ts",
+    "src/component/http.ts",
+    "src/component/jobs.ts",
+    "src/component/operations.ts",
+    "src/component/schema.ts",
+    "src/component/webhooks.ts"
+  ],
+  "duplicates": { "minTokens": 45, "minLines": 1, "threshold": 0.0001 },
+  "health": { "maxCyclomatic": 20, "maxCognitive": 15 }
+}

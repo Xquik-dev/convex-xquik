@@ -17,12 +17,12 @@ const encoder = new TextEncoder();
 
 type Check = { readonly ok: true; readonly nonce: string } | { readonly ok: false; readonly reason: string };
 
-const delivery = v.union(
+const deliveryValidator = v.union(
   v.object({ kind: v.literal("test") }),
   v.object({ event: eventFields, kind: v.literal("event") }),
 );
 
-type Delivery = Infer<typeof delivery>;
+type Delivery = Infer<typeof deliveryValidator>;
 
 type Reading = Delivery | { readonly kind: "invalid" };
 
@@ -113,5 +113,5 @@ function pulledEvents(result: unknown): EventFields[] {
   return result["events"].flatMap((item) => readEvent(item, { id: "id", type: "type" }));
 }
 
-export { check, delivery, NONCE_TTL_MS, pulledEvents, readDelivery, readEvent, TOLERANCE_MS };
+export { check, deliveryValidator, NONCE_TTL_MS, pulledEvents, readDelivery };
 export type { Check, Delivery, Reading };

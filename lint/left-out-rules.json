@@ -1,0 +1,16 @@
+{
+  "import/no-default-export": {
+    "reason": "Convex codegen fails unless convex.config.ts has a default export."
+  },
+  "import/no-named-export": {
+    "reason": "Convex names each function after its export, so a default export renames events.list."
+  },
+  "oxc/no-async-await": {
+    "reason": "A mutation must await what it reads, and the then and plain Promise forms fail other rules.",
+    "clashes": ["promise/prefer-await-to-then", "typescript/promise-function-async"]
+  },
+  "vitest/no-importing-vitest-globals": {
+    "reason": "An alias such as it as check hides each test from require-hook and expect-expect.",
+    "clashes": ["vitest/prefer-importing-vitest-globals"]
+  }
+}

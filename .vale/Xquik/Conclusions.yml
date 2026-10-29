@@ -7,7 +7,7 @@ tokens:
   - a bright future
   - only time will tell
   - (?:the )?possibilities are (?:endless|limitless)
-  - 'exciting times(?: lie)? ahead'
+  - "exciting times(?: lie)? ahead"
   - the sky's the limit
   - (?:this|it) is (?:just|only) the beginning
   - watch this space

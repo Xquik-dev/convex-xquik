@@ -66,5 +66,4 @@ function router(): HttpRouter {
   return http;
 }
 
-export { receive };
 export default router();

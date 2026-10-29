@@ -174,7 +174,7 @@ lint_prose() {
 
 run_tests() {
   local results="${workspace}/tests.json"
-  npx vitest run --coverage --reporter=default --reporter=json --outputFile.json="${results}" || return
+  npm run --silent test -- --reporter=default --reporter=json --outputFile.json="${results}" || return
   jq -e '.numPendingTests == 0 and .numTodoTests == 0' "${results}" >/dev/null || {
     jq -r '.testResults[].assertionResults[] | select(.status != "passed") | "\(.status) \(.fullName)"' "${results}" >&2
     echo "Run or delete each test above." >&2
@@ -194,7 +194,8 @@ registry_fresh() {
 
 format_check() {
   local listing files=()
-  listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js' '*.md')" || return
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js' '*.md' '*.json' '*.yml' '*.yaml')" ||
+    return
   mapfile -t files <<<"${listing}"
   npx prettier --check "${files[@]}"
 }
@@ -204,6 +205,69 @@ lint_code() {
   listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js')" || return
   mapfile -t files <<<"${listing}"
   npx eslint --max-warnings 0 "${files[@]}"
+}
+
+ban_comments() {
+  local listing files=()
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js')" || return
+  mapfile -t files <<<"${listing}"
+  "${tools}/ast-grep" test --skip-snapshot-tests && "${tools}/ast-grep" scan "${files[@]}"
+}
+
+lint_settings() {
+  local listing files=() eslint_report oxlint_report
+  listing="$(git ls-files --cached --others --exclude-standard -- '*.ts' '*.js')" || return
+  mapfile -t files <<<"${listing}"
+  eslint_report="$(node --input-type=module --eval '
+    import convex from "@convex-dev/eslint-plugin";
+    import { ESLint } from "eslint";
+    const eslint = new ESLint();
+    const rules = Object.keys(convex.rules).map((name) => "@convex-dev/" + name);
+    const weaker = [];
+    for (const file of process.argv.slice(1)) {
+      const config = await eslint.calculateConfigForFile(file);
+      weaker.push(...rules.filter((rule) => [config.rules[rule]].flat()[0] !== 2).map((rule) => file + " " + rule));
+    }
+    process.stdout.write(JSON.stringify({ rules: rules.length, weaker }));
+  ' "${files[@]}")" || return
+  jq -e '.rules == 11 and .weaker == []' <<<"${eslint_report}" >/dev/null || {
+    echo "ESLint must run its 11 Convex rules at error on every tracked file. ${eslint_report}" >&2
+    return 1
+  }
+  node_modules/.bin/oxlint --rules --format=json >"${workspace}/oxlint-rules.json" &&
+    node_modules/.bin/oxlint --print-config >"${workspace}/oxlint-config.json" || return
+  oxlint_report="$(jq -c -n --slurpfile listed "${workspace}/oxlint-rules.json" \
+    --slurpfile config "${workspace}/oxlint-config.json" --slurpfile out lint/left-out-rules.json \
+    --rawfile bans lint/banned-patterns.txt '
+    ["eslint", "import", "jest", "jsdoc", "jsx_a11y", "nextjs", "node", "oxc", "promise", "react", "typescript",
+      "unicorn", "vitest"] as $plugins
+    | [$listed[0][] | select(.scope as $scope | $plugins | index($scope))
+      | if .scope == "eslint" then .value else "\(.scope)/\(.value)" end] as $registered
+    | [$bans | split("\n")[] | select(. != "")] as $patterns
+    | [$registered[] | select(($config[0].rules[.] | if type == "array" then .[0] else . end) != "deny")] as $below
+    | [$registered[] | select(. as $name | any($patterns[]; . as $pattern | try ($name | test($pattern)) catch false))]
+    | {
+      banned: .,
+      below: $below,
+      clashing: [$out[0][] | (.clashes // [])[] | select(. as $rule | ($registered - $below) | index($rule) | not)],
+      reasons: ([$out[0][] | .reason | type] | unique),
+      left: ($out[0] | keys),
+      options: ($config[0].options | {denyWarnings, typeAware, typeCheck}),
+      typeAware: ($registered | index("typescript/no-floating-promises") != null)
+    }')" || return
+  jq -e '.banned == [] and .clashing == [] and .reasons == ["string"] and (.below | sort) == .left and .typeAware
+    and .options == {denyWarnings: true, typeAware: true, typeCheck: true}' <<<"${oxlint_report}" >/dev/null || {
+    echo "oxlint must run every rule of its 13 plugins at error, except the ones lint/left-out-rules.json names with a reason. Each rule they clash with must run at error. oxlint must run type-aware with the type check and fail on a warning. ${oxlint_report}" >&2
+    return 1
+  }
+}
+
+lint_code_health() {
+  local fallow=node_modules/.bin/fallow
+  "${fallow}" health --no-cache --complexity --coverage coverage/coverage-final.json --fail-on-issues --quiet &&
+    "${fallow}" dupes --no-cache --quiet &&
+    "${fallow}" dupes --no-cache --cross-language --quiet &&
+    "${fallow}" dead-code --no-cache --quiet
 }
 
 lint_oxlint() {
@@ -240,14 +304,14 @@ package_contents() {
 
 lint_package() {
   local report tarball status=0
-  report="$(npx publint --strict --level suggestion 2>&1)" || status=$?
+  report="$(npm run --silent publint 2>&1)" || status=$?
   [[ "${status}" == 0 && "${report}" == *"All good!"* ]] || {
     echo "${report}" >&2
     return 1
   }
   echo '{}' >"${workspace}/attw.json" &&
     tarball="$(npm pack --ignore-scripts --silent --pack-destination "${workspace}")" &&
-    npx attw "${workspace}/${tarball}" --config-path "${workspace}/attw.json" --profile esm-only
+    npm run --silent attw -- "${workspace}/${tarball}" --config-path "${workspace}/attw.json"
 }
 
 run_codeql() {
@@ -296,12 +360,14 @@ run_codeql() {
 run_check "" "Install the locked dependencies" "Run npm install and commit package-lock.json." \
   npm ci --ignore-scripts --no-fund --no-audit
 mkdir -p "${tools}"
-for name in shellcheck gitleaks lychee vale; do
+for name in ast-grep shellcheck gitleaks lychee vale; do
   run_check "" "Install the pinned ${name}" "Check network access and tools.json, then rerun." install_tool "${name}"
 done
 run_check "bans" "Suppression and exclusion ban" \
   "Remove each suppression or exclusion listed above and fix what it hid." no_banned_patterns
 run_check "shellcheck" "Shell lint with every optional shellcheck check" "Fix the shellcheck findings above." lint_shell
+run_check "comments" "Comment ban with ast-grep on every TypeScript and JavaScript file" \
+  "Put the meaning in names, types and tests, or link the page that proves the comment." ban_comments
 run_check "REUSE" "Licensing with REUSE lint" \
   "Give each file listed above a license and copyright in REUSE.toml or an SPDX header." \
   uv tool run --from "reuse==${reuse_version}" reuse lint
@@ -312,18 +378,22 @@ run_check "" "Convex code generation on a local deployment" \
   "Fix the Convex errors above, then rerun." generate_code
 run_check "fresh registry" "Operation registry matches openapi.json" \
   "Run npm run generate and commit the result." registry_fresh
-run_check "format" "Format check of the TypeScript, JavaScript and Markdown files" \
+run_check "format" "Format check of the TypeScript, JavaScript, Markdown, JSON and YAML files" \
   "Run npx prettier --write on the files listed above." format_check
 run_check "types" "Type check" "Fix the type errors above." npx tsc --noEmit --project tsconfig.json
 run_check "lint" "Type-aware lint with every Convex rule" "Fix the lint findings above." lint_code
 run_check "oxlint" "Type-aware oxlint with every rule of 13 plugins" "Fix the oxlint findings above." lint_oxlint
+run_check "lint settings" "Every Convex rule at error and every oxlint rule of 13 plugins on" \
+  "Turn each rule named above on at error, or name it with its proof in lint/left-out-rules.json." lint_settings
 run_check "100% typed" "Type coverage" "Give each value listed above a type without any." type_coverage
 run_check "audit" "Dependency audit and registry signatures" "Upgrade each package named above, then rerun." \
   audit_dependencies
 run_check "100% coverage" "Tests with 100% line, branch, function and statement coverage" \
   "Fix the failing tests, run the skipped ones, or test the lines listed above." run_tests
+run_check "fallow" "Complexity, duplication and dead code with fallow" \
+  "Split each function, merge each clone and delete each unused export or dependency listed above." lint_code_health
 run_check "100% mutation score" "Mutation testing" "Write a test that kills each surviving mutant above." \
-  npx stryker run
+  npm run --silent mutation
 run_check "package" "Package contents" "Fix the files list in package.json." package_contents
 run_check "publint and attw" "Package lint with publint and Are the Types Wrong" \
   "Fix the package.json fields or exports named above." lint_package

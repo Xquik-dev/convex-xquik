@@ -1,26 +1,13 @@
-import { execFileSync } from "node:child_process";
-
-const mutate = execFileSync(
-  "git",
-  ["ls-files", "--cached", "--others", "--exclude-standard", "src", "scripts", "example"],
-  {
-    encoding: "utf8",
-  },
-)
-  .split("\n")
-  .filter((file) => file.endsWith(".ts"));
-
 const config = {
   checkers: ["typescript"],
-  concurrency: 8,
+  concurrency: "100%",
   coverageAnalysis: "perTest",
   jsonReporter: { fileName: "reports/mutation/mutation.json" },
-  mutate,
   reporters: ["clear-text", "json", "progress"],
   testRunner: "vitest",
   thresholds: { break: 100, high: 100, low: 100 },
   timeoutMS: 10_000,
-  tsconfigFile: "tsconfig.json",
+  tsconfigFile: "tsconfig.stryker.json",
   vitest: { configFile: "vitest.config.js" },
 };
 

@@ -3,10 +3,6 @@ import globals from "globals";
 import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
-/** @type {import("@typescript-eslint/utils").TSESLint.FlatConfig.Rules} */
-const convexRules = Object.fromEntries(Object.keys(convex.rules).map((name) => [`@convex-dev/${name}`, "error"]));
-
-/** @type {import("@typescript-eslint/utils").TSESLint.FlatConfig.ConfigArray} */
 const config = [
   {
     languageOptions: {
@@ -20,7 +16,7 @@ const config = [
   ...tseslint.configs.stylisticTypeChecked,
   {
     plugins: { "@convex-dev": convex },
-    rules: convexRules,
+    rules: Object.fromEntries(Object.keys(convex.rules).map((name) => [`@convex-dev/${name}`, "error"])),
   },
   {
     rules: {

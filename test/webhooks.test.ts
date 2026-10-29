@@ -82,7 +82,7 @@ describe("the webhook receiver endpoints", () => {
   it("records the test alert on the endpoint", { timeout: 5000 }, async () => {
     expect.hasAssertions();
     const { backend, post } = await setup();
-    await expect(post(sign(TEST_ALERT))).resolves.toStrictEqual([OK, "test"]);
+    await expect(post(await sign(TEST_ALERT))).resolves.toStrictEqual([OK, "test"]);
     const { page } = await backend.query(api.webhooks.list, PAGE);
     expect(page.map((endpoint) => typeof endpoint.testedAt)).toStrictEqual(["number"]);
   });
@@ -93,8 +93,8 @@ describe("the webhook receiver deliveries", () => {
     expect.hasAssertions();
     const { backend, post } = await setup();
     const body = delivery("tweet.new", "1");
-    await expect(post(sign(body))).resolves.toStrictEqual([OK, "stored"]);
-    await expect(post(sign(body))).resolves.toStrictEqual([OK, "duplicate"]);
+    await expect(post(await sign(body))).resolves.toStrictEqual([OK, "stored"]);
+    await expect(post(await sign(body))).resolves.toStrictEqual([OK, "duplicate"]);
     const { page } = await backend.query(api.events.list, PAGE);
     expect(page.map((event) => event.streamEventId)).toStrictEqual(["1"]);
   });
@@ -102,7 +102,7 @@ describe("the webhook receiver deliveries", () => {
   it("rejects a replayed nonce, also after a purge", { timeout: 5000 }, async () => {
     expect.hasAssertions();
     const { backend, post } = await setup();
-    const signed = sign(delivery("tweet.new", "1"));
+    const signed = await sign(delivery("tweet.new", "1"));
     await expect(post(signed)).resolves.toStrictEqual([OK, "stored"]);
     await expect(post(signed)).resolves.toStrictEqual([UNAUTHORIZED, "replayed nonce"]);
     await expect(backend.mutation(internal.webhooks.purge, {})).resolves.toBe(NONE);
@@ -117,7 +117,7 @@ describe("the webhook receiver deliveries", () => {
     const late = now - FIVE_MINUTES_MS - SECOND_MS;
     const early = now + FIVE_MINUTES_MS + SECOND_MS;
     const timestamps = [String(Math.floor(now / SECOND_MS)), String(late), String(early), "17e11"];
-    const signed = timestamps.map((timestamp) => sign(body, { timestamp }));
+    const signed = await Promise.all(timestamps.map(async (timestamp) => await sign(body, { timestamp })));
     const answers = await Promise.all(signed.map(async (request) => await post(request)));
     expect(answers).toStrictEqual(timestamps.map(() => [UNAUTHORIZED, "stale timestamp"]));
   });
@@ -127,14 +127,14 @@ describe("the webhook receiver signatures", () => {
   it("rejects a changed body, a wrong secret and malformed headers", { timeout: 5000 }, async () => {
     expect.hasAssertions();
     const { post } = await setup();
-    const signed = sign(delivery("tweet.new", "1"));
+    const signed = await sign(delivery("tweet.new", "1"));
     const bad = [UNAUTHORIZED, "bad signature"];
     const unsigned = Object.fromEntries(
       Object.entries(signed.headers).filter(([name]) => name !== "x-xquik-signature"),
     );
     await expect(post({ body: ` ${signed.body}`, headers: signed.headers })).resolves.toStrictEqual(bad);
-    await expect(post(sign(signed.body, { secret: OTHER_SECRET }))).resolves.toStrictEqual(bad);
-    await expect(post(sign(signed.body, { nonce: "short" }))).resolves.toStrictEqual(bad);
+    await expect(post(await sign(signed.body, { secret: OTHER_SECRET }))).resolves.toStrictEqual(bad);
+    await expect(post(await sign(signed.body, { nonce: "short" }))).resolves.toStrictEqual(bad);
     await expect(post({ body: signed.body, headers: unsigned })).resolves.toStrictEqual(bad);
     await expect(post({ body: signed.body, headers: {} })).resolves.toStrictEqual([UNAUTHORIZED, "stale timestamp"]);
   });
@@ -151,7 +151,7 @@ describe("the webhook receiver signatures", () => {
       delivery("tweet.new", "1", { eventType: 1 }),
       "null",
     ];
-    const signed = bodies.map((body) => sign(body));
+    const signed = await Promise.all(bodies.map(async (body) => await sign(body)));
     const answers = await Promise.all(signed.map(async (request) => await post(request)));
     expect(answers).toStrictEqual(bodies.map(() => [BAD_REQUEST, "not an Xquik delivery"]));
   });
@@ -159,7 +159,7 @@ describe("the webhook receiver signatures", () => {
   it("answers 404 for an unknown URL and refuses other methods", { timeout: 5000 }, async () => {
     expect.hasAssertions();
     const { backend } = await setup();
-    const response = await backend.fetch("/webhooks/unknown", posted(sign(TEST_ALERT)));
+    const response = await backend.fetch("/webhooks/unknown", posted(await sign(TEST_ALERT)));
     const answer = [response.status, response.headers.get("content-type"), await response.text()];
     expect(answer).toStrictEqual([NOT_FOUND, "text/plain", "unknown webhook URL"]);
     const { status } = await backend.fetch("/webhooks/unknown", { method: "GET" });
@@ -177,8 +177,8 @@ describe("the webhook receiver handlers", () => {
         secret: SECRET,
       });
       const body = delivery("tweet.new", "1");
-      await backend.fetch(pathOf(url), posted(sign(body)));
-      await backend.fetch(pathOf(url), posted(sign(body)));
+      await backend.fetch(pathOf(url), posted(await sign(body)));
+      await backend.fetch(pathOf(url), posted(await sign(body)));
       return await backend.run(async (ctx) => await ctx.db.system.query("_scheduled_functions").take(SCAN));
     });
     expect(scheduled.map((job) => JSON.stringify(job)).join(",")).toContain('"streamEventId":"1"');
@@ -202,7 +202,7 @@ describe("the webhook receiver handlers", () => {
       });
       const body = delivery("tweet.new", "1");
       const deliver = async (url: string): Promise<string> => {
-        const response = await backend.fetch(pathOf(url), posted(sign(body)));
+        const response = await backend.fetch(pathOf(url), posted(await sign(body)));
         return await response.text();
       };
       const answers = [await deliver(purger), await deliver(lister), await deliver(purger), await deliver(lister)];

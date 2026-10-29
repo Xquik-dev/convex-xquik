@@ -216,8 +216,8 @@ function wirePath(path: string, args: Readonly<Record<string, unknown>>): string
   );
 }
 
-function signedPost(body: string): RequestInit {
-  const signed = sign(body);
+async function signedPost(body: string): Promise<RequestInit> {
+  const signed = await sign(body);
   return { body: signed.body, headers: signed.headers, method: "POST" };
 }
 
@@ -257,9 +257,9 @@ describe("every event type in openapi.json", () => {
     const convex = componentTest();
     const { url } = await convex.mutation(api.webhooks.add, { secret: SECRET });
     const path = new URL(url).pathname.replace("/xquik", "");
-    const first = await convex.fetch(path, signedPost(delivery(eventType, "9001")));
+    const first = await convex.fetch(path, await signedPost(delivery(eventType, "9001")));
     await expect(first.text()).resolves.toBe("stored");
-    const retry = await convex.fetch(path, signedPost(delivery(eventType, "9001")));
+    const retry = await convex.fetch(path, await signedPost(delivery(eventType, "9001")));
     await expect(retry.text()).resolves.toBe("duplicate");
     await expect(convex.query(api.events.get, { streamEventId: "9001" })).resolves.toMatchObject({
       eventType,
@@ -272,7 +272,7 @@ describe("every event type in openapi.json", () => {
     expect.hasAssertions();
     const convex = componentTest();
     const { url } = await convex.mutation(api.webhooks.add, { secret: SECRET });
-    const response = await convex.fetch(new URL(url).pathname.replace("/xquik", ""), signedPost(TEST_ALERT));
+    const response = await convex.fetch(new URL(url).pathname.replace("/xquik", ""), await signedPost(TEST_ALERT));
     expect({ status: response.status, text: await response.text() }).toStrictEqual({ status: 200, text: "test" });
   });
 });

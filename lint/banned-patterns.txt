@@ -21,3 +21,4 @@
 [t]ype-coverage:ignore
 <!--\s*[v]ale\s
 [i]gnorers"?\s*:
+[m]axCrap"?\s*:\s*0\b

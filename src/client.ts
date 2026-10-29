@@ -36,12 +36,17 @@ interface Schedule {
   readonly delayMs?: number;
 }
 
-/** Calls the Xquik component from your app's mutations and actions. */
+/**
+ * Calls the Xquik component from your app's mutations and actions.
+ *
+ * @see https://docs.xquik.com/guides/convex#call-the-twitter-api-from-a-convex-action
+ */
 class Xquik {
   public readonly component: ComponentApi;
 
   /**
    * @param {ComponentApi} component The mounted component, `components.xquik` from `./_generated/api`.
+   * @see https://docs.xquik.com/guides/convex#install-the-component
    */
   public constructor(component: ComponentApi) {
     this.component = component;
@@ -59,6 +64,7 @@ class Xquik {
    * @param {Schedule} [options] `key` keeps 1 scheduled job per key. `everyMs` repeats the job, at 60,000 ms or more.
    * `delayMs` starts it later.
    * @returns {Promise<string>} The job ID.
+   * @see https://docs.xquik.com/guides/convex#schedule-durable-twitter-api-jobs
    */
   public async schedule<Name extends OperationName>(
     ctx: MutationCtx,
@@ -76,6 +82,7 @@ class Xquik {
    * @param {ActionCtx} ctx The action context that calls Xquik.
    * @param {{ eventTypes: Readonly<EventTypes>, onEvent?: EventHandler }} args `eventTypes` to deliver, and `onEvent`, a mutation that runs once for each `streamEventId` this endpoint receives. A retry or the `webhook.test` alert does not run it.
    * @returns {Promise<{ endpointId: string, url: string, webhookId: string }>} The endpoint ID, its URL and the Xquik webhook ID.
+   * @see https://docs.xquik.com/guides/convex#receive-signed-twitter-webhook-events
    */
   public async createWebhook(
     ctx: ActionCtx,
@@ -100,6 +107,7 @@ class Xquik {
    * @param {MutationCtx} ctx The mutation context that stores the endpoint.
    * @param {{ secret: string, onEvent?: EventHandler }} args The webhook's `secret`, and `onEvent`, a mutation that runs once for each `streamEventId` this endpoint receives. A retry or the `webhook.test` alert does not run it.
    * @returns {Promise<{ endpointId: string, url: string }>} The endpoint ID and the URL to give Xquik.
+   * @see https://docs.xquik.com/guides/convex#register-a-webhook-made-elsewhere
    */
   public async addWebhook(
     ctx: MutationCtx,

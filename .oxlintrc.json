@@ -185,9 +185,7 @@
     "eslint/no-restricted-exports": [
       "error",
       {
-        "restrictedNamedExports": [
-          "then"
-        ]
+        "restrictedNamedExports": ["then"]
       }
     ],
     "eslint/no-restricted-globals": "error",
@@ -271,10 +269,7 @@
     "eslint/no-warning-comments": "error",
     "eslint/no-with": "error",
     "eslint/object-shorthand": "error",
-    "eslint/one-var": [
-      "error",
-      "never"
-    ],
+    "eslint/one-var": ["error", "never"],
     "eslint/operator-assignment": "error",
     "eslint/prefer-arrow-callback": "error",
     "eslint/prefer-const": "error",
@@ -332,6 +327,7 @@
     "import/no-named-as-default-member": "error",
     "import/no-named-default": "error",
     "import/no-namespace": "error",
+    "import/no-nodejs-modules": "error",
     "import/no-relative-parent-imports": "error",
     "import/no-self-import": "error",
     "import/no-unassigned-import": "error",
@@ -793,10 +789,7 @@
         "allowNever": false
       }
     ],
-    "typescript/return-await": [
-      "error",
-      "always"
-    ],
+    "typescript/return-await": ["error", "always"],
     "typescript/strict-boolean-expressions": "error",
     "typescript/strict-void-return": "error",
     "typescript/switch-exhaustiveness-check": "error",

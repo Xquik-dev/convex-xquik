@@ -43,4 +43,4 @@ const get = query({
   returns: v.union(v.null(), eventDoc),
 });
 
-export { eventDoc, get, list };
+export { get, list };

@@ -1,18 +1,19 @@
 import { objectAt, stringsAt } from "./nodes.ts";
-import { readFile, writeFile } from "node:fs/promises";
-import { none } from "#src/component/shape.ts";
+import { format } from "prettier";
+import type { Options } from "prettier";
+import prettierOptions from "#.prettierrc.json" with { type: "json" };
 import Reader from "./reader.ts";
 import type { Registry } from "#src/component/shape.ts";
+import spec from "#openapi.json" with { type: "json" };
 
 const METHODS = ["get", "put", "post", "patch", "delete"];
-const JSON_INDENT = 2;
 
 function byName<Value>(entries: readonly (readonly [string, Value])[]): (readonly [string, Value])[] {
   return entries.toSorted(([left], [right]) => left.localeCompare(right));
 }
 
-function readRegistry(spec: unknown): Registry {
-  const root = objectAt(spec);
+function readRegistry(source: unknown): Registry {
+  const root = objectAt(source);
   const reader = new Reader(root);
   const entries = Object.entries(objectAt(root["paths"])).flatMap(([path, item]) =>
     METHODS.flatMap((method) => reader.entry(path, method, objectAt(item))),
@@ -23,29 +24,21 @@ function readRegistry(spec: unknown): Registry {
   };
 }
 
-function eventTypes(spec: unknown): string[] {
-  const schemas = objectAt(objectAt(objectAt(spec)["components"])["schemas"]);
+function eventTypes(source: unknown): string[] {
+  const schemas = objectAt(objectAt(objectAt(source)["components"])["schemas"]);
   return ["EventType", "PostEventType"].flatMap((name) => stringsAt(objectAt(schemas[name])["enum"]));
 }
 
-function renderOperations(registry: Registry): string {
-  const names = Object.keys(registry.operations).map((id) => `  ${id},`);
-  const lines = [
-    'import { operations } from "./operation.js";',
-    "",
-    "export const {",
-    ...names,
-    "} = operations();",
-    "",
-  ];
-  return lines.join("\n");
+async function registryJson(): Promise<string> {
+  const options: Options = { parser: "json" };
+  return await format(JSON.stringify(readRegistry(spec)), Object.assign(options, prettierOptions));
 }
 
-async function writeGenerated(root: string): Promise<void> {
-  const spec: unknown = JSON.parse(await readFile(`${root}/openapi.json`, "utf8"));
-  const registry = readRegistry(spec);
-  await writeFile(`${root}/src/component/registry.json`, `${JSON.stringify(registry, none, JSON_INDENT)}\n`);
-  await writeFile(`${root}/src/component/operations.ts`, renderOperations(registry));
+function operationsModule(): string {
+  const names = Object.keys(readRegistry(spec).operations).map((id) => `  ${id},`);
+  return ['import { operations } from "./operation.js";', "", "export const {", ...names, "} = operations();", ""].join(
+    "\n",
+  );
 }
 
-export { eventTypes, readRegistry, renderOperations, writeGenerated };
+export { eventTypes, operationsModule, readRegistry, registryJson };

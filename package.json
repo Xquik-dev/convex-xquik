@@ -62,6 +62,7 @@
     }
   },
   "imports": {
+    "#.prettierrc.json": "./.prettierrc.json",
     "#example/*": "./example/*",
     "#openapi.json": "./openapi.json",
     "#scripts/*": "./scripts/*",
@@ -70,14 +71,16 @@
   "types": "./dist/client.d.ts",
   "module": "./dist/client.js",
   "scripts": {
-    "generate": "node -e \"import('./scripts/registry.ts').then((registry) => registry.writeGenerated('.'))\"",
+    "generate": "node --input-type=module --eval \"import { registryJson } from './scripts/registry.ts'; process.stdout.write(await registryJson());\" >src/component/registry.json && node --input-type=module --eval \"import { operationsModule } from './scripts/registry.ts'; process.stdout.write(operationsModule());\" >src/component/operations.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint --max-warnings 0 $(git ls-files --cached --others --exclude-standard '*.ts' '*.js')",
     "type-coverage": "type-coverage --project tsconfig.json --strict --at-least 100 --detail -- $(git ls-files --cached --others --exclude-standard '*.ts' '*.js')",
-    "test": "vitest run --coverage",
-    "mutation": "stryker run",
+    "test": "vitest run --coverage $(git ls-files --cached --others --exclude-standard 'src/*.ts' 'scripts/*.ts' 'example/*.ts' | sed 's/^/--coverage.include=/')",
+    "mutation": "stryker run --mutate \"$(git ls-files --cached --others --exclude-standard 'src/*.ts' 'scripts/*.ts' 'example/*.ts' | paste -sd , -)\"",
     "prepack": "convex codegen --component-dir ./src/component && rm -rf dist && tsc --project tsconfig.build.json && convex codegen",
-    "bundle": "rm -rf dist && tsc --project tsconfig.build.json"
+    "bundle": "rm -rf dist && tsc --project tsconfig.build.json",
+    "publint": "publint --strict --level suggestion",
+    "attw": "attw --profile esm-only"
   },
   "peerDependencies": {
     "convex": "^1.48.0"
@@ -91,11 +94,12 @@
     "@stryker-mutator/typescript-checker": "10.1.1",
     "@stryker-mutator/vitest-runner": "10.1.1",
     "@types/node": "26.6.5",
-    "@typescript-eslint/utils": "8.72.1",
     "@vitest/coverage-v8": "5.0.5",
     "convex": "1.48.0",
     "convex-test": "0.0.66",
     "eslint": "10.13.0",
+    "fallow": "3.37.0",
+    "fast-check": "4.10.2",
     "globals": "17.13.0",
     "oxlint": "1.90.0",
     "oxlint-tsgolint": "7.0.2005",
