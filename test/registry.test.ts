@@ -5,10 +5,23 @@ import { parseRegistry } from "#src/component/shape.ts";
 
 interface Generated {
   readonly ids: readonly string[];
+  readonly lines: readonly string[];
   readonly operations: readonly string[];
 }
 
 const PUBLIC_OPERATIONS = 190;
+const FIRST_LINE = 0;
+const HEAD_LINES = 8;
+const REGISTRY_HEAD = [
+  "{",
+  '  "operations": {',
+  '    "addTicketMessage": {',
+  '      "args": {',
+  '        "id": { "optional": false, "shape": "string" },',
+  '        "idempotencyKey": { "optional": true, "shape": "string" },',
+  '        "body": { "optional": false, "shape": { "ref": "SupportMessageBody" } }',
+  "      },",
+];
 const NOT_AN_EVENT = 1;
 
 const KEYED_SPEC = {
@@ -82,8 +95,13 @@ const NODE_SCHEMAS = { Node: { properties: { next: { $ref: "#/components/schemas
 const DONE_THEN_LOOP = { done: { $ref: "#/components/schemas/Done" }, loop: { $ref: "#/components/schemas/Loop" } };
 
 async function generate(): Promise<Generated> {
-  const registry: unknown = JSON.parse(await registryJson());
-  return { ids: Object.keys(parseRegistry(registry).operations), operations: operationsModule().split("\n") };
+  const text = await registryJson();
+  const registry: unknown = JSON.parse(text);
+  return {
+    ids: Object.keys(parseRegistry(registry).operations),
+    lines: text.split("\n").slice(FIRST_LINE, HEAD_LINES),
+    operations: operationsModule().split("\n"),
+  };
 }
 
 function ok(schema: unknown): unknown {
@@ -97,9 +115,10 @@ function schemaRef(name: string): unknown {
 describe("the generator", () => {
   it("writes the registry and 1 action export per public operation", { timeout: 10_000 }, async () => {
     expect.hasAssertions();
-    const { ids, operations } = await generate();
+    const { ids, lines, operations } = await generate();
     const names = ids.map((id) => `  ${id},`);
     expect(ids).toHaveLength(PUBLIC_OPERATIONS);
+    expect(lines).toStrictEqual(REGISTRY_HEAD);
     expect(operations).toStrictEqual([
       'import { operations } from "./operation.js";',
       "",

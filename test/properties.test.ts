@@ -204,25 +204,34 @@ describe("the webhook signature check", () => {
 });
 
 describe("the webhook timestamp check", () => {
-  it("rejects every signed body whose timestamp is more than 5 minutes from the clock", { timeout: 20_000 }, async () => {
-    expect.hasAssertions();
-    const skew = oneof(integer({ max: FAR_FUTURE_MS, min: JUST_STALE_MS }), integer({ max: -JUST_STALE_MS, min: -NOW }));
-    await holds(
-      asyncProperty(secret, body, skew, async (secretKey, text, offset) => {
-        await expect(verdict(secretKey, text, encoder.encode(text).buffer, String(NOW + offset))).resolves.toStrictEqual({
-          ok: false,
-          reason: "stale timestamp",
-        });
-      }),
-      {
-        examples: [
-          ["s", "{}", JUST_STALE_MS],
-          ["s", "{}", -JUST_STALE_MS],
-        ],
-        seed: SEED,
-      },
-    );
-  });
+  it(
+    "rejects every signed body whose timestamp is more than 5 minutes from the clock",
+    { timeout: 20_000 },
+    async () => {
+      expect.hasAssertions();
+      const skew = oneof(
+        integer({ max: FAR_FUTURE_MS, min: JUST_STALE_MS }),
+        integer({ max: -JUST_STALE_MS, min: -NOW }),
+      );
+      await holds(
+        asyncProperty(secret, body, skew, async (secretKey, text, offset) => {
+          await expect(
+            verdict(secretKey, text, encoder.encode(text).buffer, String(NOW + offset)),
+          ).resolves.toStrictEqual({
+            ok: false,
+            reason: "stale timestamp",
+          });
+        }),
+        {
+          examples: [
+            ["s", "{}", JUST_STALE_MS],
+            ["s", "{}", -JUST_STALE_MS],
+          ],
+          seed: SEED,
+        },
+      );
+    },
+  );
 });
 
 describe("the operation argument validators", () => {

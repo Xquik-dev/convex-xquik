@@ -9,7 +9,7 @@ rule:
     any:
       - regex: https://
       - regex: '^///\s*<reference\s'
-      - regex: '[#@]__(PURE|NO_SIDE_EFFECTS)__'
+      - regex: "[#@]__(PURE|NO_SIDE_EFFECTS)__"
       - regex: SPDX-(License-Identifier|FileCopyrightText)
       - precedes:
           kind: comment
