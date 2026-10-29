@@ -1,4 +1,4 @@
-import type { FunctionHandle } from "convex/server";
+import { paginationOptsValidator, paginationResultValidator, type FunctionHandle } from "convex/server";
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api.js";
 import type { Id } from "./_generated/dataModel.js";
@@ -100,17 +100,20 @@ export const add = mutation({
 });
 
 export const list = query({
-  args: {},
-  returns: v.array(endpointView),
-  handler: async (ctx) => {
+  args: { paginationOpts: paginationOptsValidator },
+  returns: paginationResultValidator(endpointView),
+  handler: async (ctx, { paginationOpts }) => {
     requireApiKey(env.XQUIK_API_KEY);
-    const endpoints = await ctx.db.query("endpoints").take(100);
-    return endpoints.map(({ _id, token, webhookId, testedAt }) => ({
-      endpointId: _id,
-      url: urlOf(token),
-      webhookId: webhookId ?? null,
-      testedAt: testedAt ?? null,
-    }));
+    const endpoints = await ctx.db.query("endpoints").order("desc").paginate(paginationOpts);
+    return {
+      ...endpoints,
+      page: endpoints.page.map(({ _id, token, webhookId, testedAt }) => ({
+        endpointId: _id,
+        url: urlOf(token),
+        webhookId: webhookId ?? null,
+        testedAt: testedAt ?? null,
+      })),
+    };
   },
 });
 

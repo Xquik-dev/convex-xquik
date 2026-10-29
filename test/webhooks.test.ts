@@ -37,10 +37,12 @@ async function setup(): Promise<{
   return { t, post, endpointId };
 }
 
+const PAGE = { paginationOpts: { numItems: 10, cursor: null } };
+
 describe("the webhook receiver", () => {
   test("gives each endpoint its own URL and never lists the secret", async () => {
     const { t, endpointId } = await setup();
-    const listed = await t.query(api.webhooks.list, {});
+    const { page: listed } = await t.query(api.webhooks.list, PAGE);
     expect(listed).toHaveLength(1);
     expect(listed[0]?.endpointId).toBe(endpointId);
     expect(listed[0]?.url.startsWith(`${SITE}/webhooks/`)).toBe(true);
@@ -48,10 +50,20 @@ describe("the webhook receiver", () => {
     expect([listed[0]?.webhookId, listed[0]?.testedAt]).toEqual([null, null]);
   });
 
+  test("pages through endpoints from the newest", async () => {
+    const { t, endpointId: oldest } = await setup();
+    const { endpointId: middle } = await t.mutation(api.webhooks.add, { secret: SECRET });
+    const { endpointId: newest } = await t.mutation(api.webhooks.add, { secret: SECRET });
+    const first = await t.query(api.webhooks.list, { paginationOpts: { numItems: 2, cursor: null } });
+    const rest = await t.query(api.webhooks.list, { paginationOpts: { numItems: 2, cursor: first.continueCursor } });
+    expect([first.page.map((endpoint) => endpoint.endpointId), first.isDone]).toEqual([[newest, middle], false]);
+    expect([rest.page.map((endpoint) => endpoint.endpointId), rest.isDone]).toEqual([[oldest], true]);
+  });
+
   test("records the test alert on the endpoint", async () => {
     const { t, post } = await setup();
     expect(await post(sign(TEST_ALERT))).toEqual([200, "test"]);
-    const [endpoint] = await t.query(api.webhooks.list, {});
+    const [endpoint] = (await t.query(api.webhooks.list, PAGE)).page;
     expect(endpoint?.testedAt).toBeTypeOf("number");
   });
 
@@ -213,7 +225,7 @@ describe("creating and removing webhooks through Xquik", () => {
     expect(JSON.parse(recorded[0]?.body ?? "")).toEqual({ eventTypes: ["tweet.new"], url: created.url });
     const path = new URL(created.url).pathname.replace("/xquik", "");
     expect((await t.fetch(path, { method: "POST", ...sign(TEST_ALERT) })).status).toBe(200);
-    const [listed] = await t.query(api.webhooks.list, {});
+    const [listed] = (await t.query(api.webhooks.list, PAGE)).page;
     expect([listed?.endpointId, listed?.url, listed?.webhookId, typeof listed?.testedAt]).toEqual([
       created.endpointId,
       created.url,
@@ -223,7 +235,7 @@ describe("creating and removing webhooks through Xquik", () => {
     const removal = stubFetch(() => Response.json({ success: true }));
     await t.action(api.webhooks.remove, { endpointId: created.endpointId });
     expect(removal.map(({ method, url }) => `${method} ${url.pathname}`)).toEqual(["DELETE /api/v1/webhooks/42"]);
-    expect(await t.query(api.webhooks.list, {})).toEqual([]);
+    expect((await t.query(api.webhooks.list, PAGE)).page).toEqual([]);
     expect(await t.query(internal.webhooks.webhookOf, { endpointId: created.endpointId })).toBeNull();
   });
 

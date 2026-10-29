@@ -1,5 +1,7 @@
 # Twitter API & X data in Convex with Xquik
 
+[![Convex Component](https://www.convex.dev/components/badge/convex-xquik)](https://www.convex.dev/components/convex-xquik)
+
 A Convex component for every public Xquik X API operation, signed webhooks & live event queries.
 
 Xquik is the world's fastest and cheapest X Twitter scraper service with the most complete X data.
