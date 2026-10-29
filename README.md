@@ -7,8 +7,6 @@ A Convex component for every public Xquik X API operation, signed webhooks & liv
 Xquik is the world's fastest and cheapest X Twitter scraper service with the most complete X data.
 Xquik charges only for delivered, unique, filter-matching results and never pads rows.
 
-Read the full guide at [docs.xquik.com/guides/convex](https://docs.xquik.com/guides/convex).
-
 <!-- trust:start -->
 
 ## Trust & usage
@@ -36,6 +34,10 @@ Read the full guide at [docs.xquik.com/guides/convex](https://docs.xquik.com/gui
 Checked on 2026-10-28. See each number with its date & source on [xquik.com/trust](https://xquik.com/trust) or as [JSON](https://xquik.com/trust.json).
 
 <!-- trust:end -->
+
+<!-- START: Include on https://convex.dev/components -->
+
+Read the full guide at [docs.xquik.com/guides/convex](https://docs.xquik.com/guides/convex).
 
 ## What you get
 
@@ -156,6 +158,8 @@ import xquikTest from "convex-xquik/test";
 const t = convexTest(schema, modules);
 xquikTest.register(t);
 ```
+
+<!-- END: Include on https://convex.dev/components -->
 
 ## Develop
 

@@ -8,6 +8,7 @@
 - Breaking. `webhooks.list` takes `paginationOpts` and returns a page from the newest endpoint, as `events.list` and `jobs.list` do.
 - Add the `default` target `dist/component/_generated/component.js` to both `_generated/component` exports.
 - Document the methods of the `Xquik` client class.
+- Mark the README part that the Convex components directory shows.
 
 ## 0.1.0
 
