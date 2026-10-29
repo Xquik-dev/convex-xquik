@@ -9,6 +9,7 @@
 - Add the `default` target `dist/component/_generated/component.js` to both `_generated/component` exports.
 - Document the methods of the `Xquik` client class.
 - Mark the README part that the Convex components directory shows.
+- Breaking. The package is now `xquik-convex`. Install it and change each `convex-xquik` import.
 
 ## 0.1.0
 

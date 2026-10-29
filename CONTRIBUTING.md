@@ -44,7 +44,7 @@ Replace `openapi.json` with the latest `https://xquik.com/openapi.json`. Then ru
    bin/release-local --dry-run
    ```
 
-3. Name the Keychain item that holds an npm token that can publish `convex-xquik`, then release.
+3. Name the Keychain item that holds an npm token that can publish `xquik-convex`, then release.
 
    ```bash
    NPM_KEYCHAIN_SERVICE=<service> NPM_KEYCHAIN_ACCOUNT=<account> bin/release-local

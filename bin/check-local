@@ -12,7 +12,7 @@ fi
 
 cd "${root}"
 
-repository="Xquik-dev/convex-xquik"
+repository="Xquik-dev/xquik-convex"
 status_context="xquik-local-checks"
 reuse_version="6.2.0"
 
@@ -49,7 +49,7 @@ post_status() {
     echo "check-local: could not post the ${state} ${status_context} status. Run gh auth status." >&2
 }
 
-workspace="$(mktemp -d "${TMPDIR:-/tmp}/convex-xquik-check-local.XXXXXX")"
+workspace="$(mktemp -d "${TMPDIR:-/tmp}/xquik-convex-check-local.XXXXXX")"
 current_check="Setup"
 passed=()
 summary=""
@@ -85,7 +85,7 @@ run_check() {
   [[ -z "${label}" ]] || passed+=("${label}")
 }
 
-tools="${XDG_CACHE_HOME:-${HOME}/.cache}/convex-xquik/tools"
+tools="${XDG_CACHE_HOME:-${HOME}/.cache}/xquik-convex/tools"
 kernel="$(uname -s)"
 machine="$(uname -m)"
 case "${kernel}-${machine}" in

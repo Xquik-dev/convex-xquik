@@ -1,5 +1,5 @@
 {
-  "name": "convex-xquik",
+  "name": "xquik-convex",
   "version": "0.2.0",
   "description": "Convex component for X (Twitter) data & actions through Xquik, with signed webhooks & live queries. Not affiliated with X Corp.",
   "license": "Apache-2.0",
@@ -11,10 +11,10 @@
   "homepage": "https://docs.xquik.com/guides/convex",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/Xquik-dev/convex-xquik.git"
+    "url": "git+https://github.com/Xquik-dev/xquik-convex.git"
   },
   "bugs": {
-    "url": "https://github.com/Xquik-dev/convex-xquik/issues"
+    "url": "https://github.com/Xquik-dev/xquik-convex/issues"
   },
   "keywords": [
     "convex",

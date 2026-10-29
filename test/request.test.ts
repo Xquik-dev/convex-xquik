@@ -38,7 +38,7 @@ describe("send", () => {
     expect(request?.url.toString()).toBe("https://xquik.com/api/v1/things/a%20b?tags=x&tags=y&limit=5");
     expect([...(request?.headers ?? [])]).toEqual([
       ["idempotency-key", "k1"],
-      ["user-agent", "convex-xquik"],
+      ["user-agent", "xquik-convex"],
       ["x-api-key", "xq_test"],
     ]);
     expect(request?.body).toBe("");

@@ -1,6 +1,6 @@
 import { paginationOptsValidator, paginationResultValidator, type Auth, type PaginationResult } from "convex/server";
 import { ConvexError, v } from "convex/values";
-import { eventDoc, eventFields, Xquik, type EventDoc } from "convex-xquik";
+import { eventDoc, eventFields, Xquik, type EventDoc } from "xquik-convex";
 import { components, internal } from "./_generated/api.js";
 import { internalAction, internalMutation, query } from "./_generated/server.js";
 

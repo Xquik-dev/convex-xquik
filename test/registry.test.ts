@@ -47,7 +47,7 @@ function objectSpec(body: unknown): unknown {
 
 describe("the generator", () => {
   test("writes the registry and 1 action export per public operation", () => {
-    const work = mkdtempSync(join(tmpdir(), "convex-xquik-"));
+    const work = mkdtempSync(join(tmpdir(), "xquik-convex-"));
     try {
       mkdirSync(join(work, "src/component"), { recursive: true });
       copyFileSync(join(root, "openapi.json"), join(work, "openapi.json"));

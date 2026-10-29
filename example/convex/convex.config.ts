@@ -1,6 +1,6 @@
 import { defineApp } from "convex/server";
 import { v } from "convex/values";
-import xquik from "convex-xquik/convex.config.js";
+import xquik from "xquik-convex/convex.config.js";
 
 const app = defineApp({ env: { XQUIK_API_KEY: v.optional(v.string()) } });
 

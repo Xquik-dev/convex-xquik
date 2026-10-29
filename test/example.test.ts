@@ -135,7 +135,7 @@ describe("the example app", () => {
   });
 
   test("mounts the component under /xquik/ with the app's API key", async () => {
-    vi.doMock("convex-xquik/convex.config.js", () => ({
+    vi.doMock("xquik-convex/convex.config.js", () => ({
       default: { componentDefinitionPath: "xquik", defaultName: "xquik" },
     }));
     const { default: app } = await import("../example/convex/convex.config.js");
@@ -145,7 +145,7 @@ describe("the example app", () => {
       childComponents: [{ name: "xquik", env: [["XQUIK_API_KEY", { type: "envVar", name: "XQUIK_API_KEY" }]] }],
       httpMounts: { "/xquik/": "_reference/childComponent/xquik" },
     });
-    vi.doUnmock("convex-xquik/convex.config.js");
+    vi.doUnmock("xquik-convex/convex.config.js");
   });
 
   test("shows pulled events in the live query", async () => {
@@ -173,7 +173,7 @@ describe("the example app", () => {
   });
 });
 
-describe("the convex-xquik/test helper", () => {
+describe("the xquik-convex/test helper", () => {
   test("registers every component module that defines Convex functions", async () => {
     const folder = new URL("../src/component/", import.meta.url);
     const files = readdirSync(folder).filter((file) => file.endsWith(".ts") && file !== "convex.config.ts");

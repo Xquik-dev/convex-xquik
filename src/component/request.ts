@@ -137,7 +137,7 @@ function url(operation: Operation, args: Args): URL {
 }
 
 function headers(operation: Operation, args: Args, apiKey: string): Headers {
-  const result = new Headers({ "x-api-key": apiKey, "user-agent": "convex-xquik" });
+  const result = new Headers({ "x-api-key": apiKey, "user-agent": "xquik-convex" });
   if (operation.body !== null) result.set("content-type", "application/json");
   for (const param of operation.params) {
     const value = args[param.name];
